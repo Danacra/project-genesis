@@ -13,15 +13,15 @@ function livingSchema() {
 }
 export class SurvivorData extends TypeDataModel { static defineSchema() {return livingSchema();} }
 export class NPCData extends TypeDataModel { static defineSchema() {return livingSchema();} }
-const reservation = new SchemaField({
+const makeReservation = () => new SchemaField({
   itemId:text(''),count:int(1,1,999999),code:text(''),name:text(''),type:text('material'),img:text(''),
   unitMass:dec(0),unitVolume:dec(0),quality:int(0,0,10),techTier:int(0,0,10),
   description:text(''),containerId:text('')
 });
-const industryJob = new SchemaField({
+const makeIndustryJob = () => new SchemaField({
   id:text(''),subject:text(''),name:text(''),amount:int(1,1,10),remaining:int(0,0,1000),
   startedDay:int(0,0,9999999),createdBy:text(''),userId:text(''),
-  reserved:new ArrayField(reservation,{initial:()=>[]})
+  reserved:new ArrayField(makeReservation(),{initial:()=>[]})
 });
 export class ColonyData extends TypeDataModel {
   static defineSchema(){return {
@@ -35,8 +35,8 @@ export class ColonyData extends TypeDataModel {
       discoveries:new ArrayField(new SchemaField({techId:text(''),day:int(0,0,9999999),by:text('')}),{initial:()=>[]})
     }),
     industry:new SchemaField({
-      jobs:new ArrayField(industryJob,{initial:()=>[]}),
-      construction:new ArrayField(industryJob,{initial:()=>[]}),
+      jobs:new ArrayField(makeIndustryJob(),{initial:()=>[]}),
+      construction:new ArrayField(makeIndustryJob(),{initial:()=>[]}),
       buildings:new ArrayField(new SchemaField({id:text(''),count:int(1,0,100),builtDay:int(0,0,9999999),lastClaimDay:int(0,0,9999999)}),{initial:()=>[]}),
       // 0.6 scene links, additive schema for existing 0.5 colonies.
       placements:new ArrayField(new SchemaField({
