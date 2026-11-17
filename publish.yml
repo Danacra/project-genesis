@@ -1,0 +1,46 @@
+name: Publish PROJECT GENESIS (Foundry VTT)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-project-genesis
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Test and publish system
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout files
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run automated tests
+        run: node --test tests/*.test.mjs
+      - name: Prepare release archive and manifest
+        run: python3 scripts/package_release.py
+      - name: Create GitHub Release when version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v$(python3 -c 'import json; print(json.load(open("system.json", encoding="utf-8"))["version"])')"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping publish."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            dist/system.json dist/project-genesis.zip \
+            --target "$GITHUB_SHA" \
+            --title "PROJECT GENESIS $TAG" \
+            --notes "PROJECT GENESIS $TAG — Foundry VTT v13. Download the manifest or ZIP from the attached release assets."
+          echo "Public manifest: https://github.com/$GITHUB_REPOSITORY/releases/latest/download/system.json"
