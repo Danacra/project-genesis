@@ -1,0 +1,59 @@
+{
+  "id": "project-genesis",
+  "title": "PROJECT GENESIS",
+  "description": "Самостоятельная RPG-система: выживание на необитаемой планете, исследования, строительство на карте, инженерные сети, добыча, ручной труд и логистика экипажа.",
+  "version": "0.8.1",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "authors": [
+    {
+      "name": "PROJECT GENESIS — community prototype"
+    }
+  ],
+  "esmodules": [
+    "genesis.mjs"
+  ],
+  "styles": [
+    "styles/genesis.css"
+  ],
+  "languages": [
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "lang/ru.json"
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "socket": true,
+  "documentTypes": {
+    "Actor": {
+      "survivor": {},
+      "npc": {},
+      "colony": {}
+    },
+    "Item": {
+      "material": {},
+      "gear": {},
+      "tool": {},
+      "component": {},
+      "consumable": {},
+      "container": {}
+    }
+  },
+  "grid": {
+    "distance": 1,
+    "units": "m"
+  },
+  "primaryTokenAttribute": "survival.health",
+  "secondaryTokenAttribute": "survival.oxygen",
+  "url": "https://github.com/Danacra/project-genesis",
+  "manifest": "https://github.com/Danacra/project-genesis/releases/latest/download/system.json",
+  "download": "https://github.com/Danacra/project-genesis/releases/download/v0.8.1/project-genesis.zip"
+}

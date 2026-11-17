@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs>
+ <linearGradient id="ground" x2="0.8" y2="1"><stop stop-color="#274147"/><stop offset="1" stop-color="#172930"/></linearGradient>
+ <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" stroke="#87a6a1" stroke-opacity=".19" fill="none"/></pattern>
+ </defs><rect width="254" height="254" x="1" y="1" rx="9" fill="url(#ground)" stroke="#81c89f" stroke-width="2"/>
+ <rect x="7" y="7" width="242" height="242" rx="7" fill="url(#grid)"/>
+ <rect x="48" y="56" width="160" height="142" rx="10" fill="#346651" stroke="#a7dfae" stroke-width="7"/><path d="M77 76 V182 M125 75 V185 M174 75 V184" stroke="#9ee4a8" stroke-width="10"/><path d="M60 114 H193 M60 150 H193" stroke="#59896d" stroke-width="6"/>
+ <rect x="13" y="215" width="230" height="27" rx="5" fill="#0d2029" fill-opacity=".96"/>
+ <text x="128" y="233" text-anchor="middle" fill="#eff8f5" font-family="Arial,sans-serif" font-size="12" font-weight="bold" letter-spacing=".6">ТЕПЛИЦА</text>
+ </svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs>
+ <linearGradient id="ground" x2="0.8" y2="1"><stop stop-color="#274147"/><stop offset="1" stop-color="#172930"/></linearGradient>
+ <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" stroke="#87a6a1" stroke-opacity=".19" fill="none"/></pattern>
+ </defs><rect width="254" height="254" x="1" y="1" rx="9" fill="url(#ground)" stroke="#b1b7d5" stroke-width="2"/>
+ <rect x="7" y="7" width="242" height="242" rx="7" fill="url(#grid)"/>
+ <rect x="49" y="48" width="158" height="159" rx="24" fill="#57586a" stroke="#c5c3e0" stroke-width="7"/><rect x="76" y="83" width="104" height="94" rx="11" fill="#8290a7"/><path d="M76 125 H180" stroke="#ccd4e4" stroke-width="9"/><rect x="109" y="120" width="39" height="57" fill="#353d54"/>
+ <rect x="13" y="215" width="230" height="27" rx="5" fill="#0d2029" fill-opacity=".96"/>
+ <text x="128" y="233" text-anchor="middle" fill="#eff8f5" font-family="Arial,sans-serif" font-size="12" font-weight="bold" letter-spacing=".6">ЖИЛОЙ МОДУЛЬ</text>
+ </svg>

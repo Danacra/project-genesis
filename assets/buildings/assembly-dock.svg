@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs>
+ <linearGradient id="ground" x2="0.8" y2="1"><stop stop-color="#274147"/><stop offset="1" stop-color="#172930"/></linearGradient>
+ <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" stroke="#87a6a1" stroke-opacity=".19" fill="none"/></pattern>
+ </defs><rect width="254" height="254" x="1" y="1" rx="9" fill="url(#ground)" stroke="#d4b7a0" stroke-width="2"/>
+ <rect x="7" y="7" width="242" height="242" rx="7" fill="url(#grid)"/>
+ <rect x="27" y="46" width="203" height="165" rx="9" fill="#524c56" stroke="#c5afa8" stroke-width="7"/><path d="M60 198 V58 M194 198 V58 M60 74 H194" stroke="#e0bd93" stroke-width="14"/><path d="M106 188 L128 91 L150 188Z" fill="#9badc0" stroke="#e2e8f0" stroke-width="5"/>
+ <rect x="13" y="215" width="230" height="27" rx="5" fill="#0d2029" fill-opacity=".96"/>
+ <text x="128" y="233" text-anchor="middle" fill="#eff8f5" font-family="Arial,sans-serif" font-size="12" font-weight="bold" letter-spacing=".6">СБОРОЧНЫЙ ДОК</text>
+ </svg>
