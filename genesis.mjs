@@ -29,6 +29,7 @@ Hooks.once('init',()=>{
   sheetConfig.registerSheet(Item,ID,GenesisItemSheet,{types:['material','gear','tool','component','consumable','container'],makeDefault:true,label:'PROJECT GENESIS — предмет'});
   game.settings.register(ID,'worldDay',{name:'День экспедиции',scope:'world',config:false,type:Number,default:1});
   game.settings.register(ID,'logisticsJournal',{name:'Журнал логистики',scope:'world',config:false,type:Object,default:{entries:[],processed:[]}});
+  game.settings.register(ID,'dayOperation',{name:'Незавершённый переход суток',scope:'world',config:false,type:Object,default:{}});
   CONFIG.projectGenesis={abilities:ABILITIES,skills:SKILLS,technologies:TECHNOLOGIES};
   validateCatalog();
   validateIndustryCatalog();
@@ -41,5 +42,5 @@ Hooks.once('ready',()=>{
   initializeNetworks();
   initializeCrew();
   game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement};
-  console.info('PROJECT GENESIS v0.8.1 ready');
+  console.info('PROJECT GENESIS v0.8.4 ready');
 });

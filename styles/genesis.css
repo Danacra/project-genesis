@@ -176,3 +176,54 @@
 .genesis-crew-chips span{font-size:11px;color:#c8ead8;background:#2b4746;border:1px solid #446a5d;border-radius:4px;padding:4px 6px;}
 .genesis-resource-ghost{font-size:12px;font-weight:700;text-align:center;color:white;text-shadow:0 1px 4px #000;}
 @media(max-width:720px){.genesis-crew-summary{grid-template-columns:1fr 1fr 1fr}.genesis-crew-site-grid{grid-template-columns:1fr}}
+
+/* v0.8.3: keep tab navigation visible across Foundry v13 themes.
+   Avoid the generic <nav> styling of themes and other modules. */
+.genesis .genesis-layout > .genesis-tabbar {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  position: relative;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 48px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  z-index: 2;
+  box-sizing: border-box;
+}
+.genesis .genesis-tabbar > [data-genesis-tab] {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+  min-height: 46px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  cursor: pointer;
+}
+.genesis .genesis-tabbar > [data-genesis-tab][aria-selected="true"] {
+  background: #21363d;
+  color: var(--pg-accent);
+  border-bottom-color: var(--pg-accent);
+}
+
+/* v0.8.4: reliable navigation fallback inside the always-visible banner */
+.genesis .genesis-banner {flex-wrap:wrap;}
+.genesis .genesis-header-controls {display:flex!important;align-items:flex-end;gap:9px;flex:0 1 300px;min-width:200px;visibility:visible!important;opacity:1!important;}
+.genesis .genesis-header-switcher {display:flex!important;flex-direction:column;gap:4px;min-width:0;flex:1;margin:0!important;color:#d4e6dc;font-size:11px;}
+.genesis .genesis-header-switcher select {display:block!important;width:100%;max-width:100%;padding:7px 9px!important;min-height:36px;opacity:1!important;visibility:visible!important;cursor:pointer;}
+.genesis .genesis-header-inventory {display:inline-flex!important;align-items:center;justify-content:center;min-height:36px;white-space:nowrap;padding:7px 10px;visibility:visible!important;opacity:1!important;}
+.genesis .genesis-inventory-summary {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.genesis .genesis-inventory-summary h2 {margin:0 0 6px;}
+.genesis .genesis-inventory-summary p {margin:0;}
+.genesis .genesis-inventory-summary button {flex:0 0 auto;}
+.genesis .genesis-layout > [data-genesis-page][hidden] {display:none!important;}
+@media(max-width:730px) {
+ .genesis .genesis-header-controls{flex:1 1 100%;order:3;min-width:100%;}
+ .genesis .genesis-day{margin-left:auto;}
+ .genesis .genesis-tabbar > [data-genesis-tab]{min-height:40px;}
+}

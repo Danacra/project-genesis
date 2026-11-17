@@ -1,0 +1,832 @@
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,3 +1,27 @@
++## v0.8.5 — безопасные игровые сутки и исправления аудита
++
++- Атомарно планируемый, сохраняемый в world settings переход суток: абсолютные итоги ресурсов, состояния выживших, производства и заданий экипажа; устойчивость к сбою, автоматическое восстановление при старте GM, блокировка команд во время незавершённой операции.
++- Блокировка вложения очков исследований по фактическим условиям сервера (инфраструктура, питание, предварительные открытия, очки) с описанием причины.
++- Согласованный выбор видимой технологии после фильтрации и сообщение о пустой выдаче.
++- Подписанные адресаты передачи предметов: выживший, общий склад, NPC только для GM и пояснение доступа к чужому выжившему.
++- Версия в листе берётся из `game.system.version`.
++- Регрессионные тесты с имитацией сбоя на середине перехода суток.
++
++## v0.8.4 — резервное переключение вкладок и отображение инвентаря
++
++- Всегда видимый список разделов в шапке листа колонии и персонажа (резервное меню).
++- Кнопка «Инвентарь» в шапке и карточка личного инвентаря на обзоре выжившего.
++- Подписи разделяют личный инвентарь выжившего и общий склад колонии.
++- Выбранный раздел синхронизирован с основным меню и резервным списком.
++- Совместимость существующих предметов, персонажей и колоний сохранена: меняется только UI.
++
++## v0.8.3 — исправление панели разделов (тестовый выпуск)
++
++- Основная навигация листа колонии больше не использует HTML-элемент nav, который может затрагиваться стилями Foundry/модулей.
++- Добавлены явные правила отображения горизонтальной панели вкладок и прокрутки на узких экранах.
++- Добавлены aria-selected и регрессионные проверки шаблона.
++- Существующие документы колонии и персонажей не изменяются.
++
+ ## 0.8.2 — Foundry v13 startup hotfix
+ 
+ - Исправлено аварийное завершение инициализации мира с ошибкой `The element DataField already has a parent`.
+--- /dev/null
++++ b/TESTING_0.8.3_RU.md
+@@ -0,0 +1,16 @@
++# PROJECT GENESIS 0.8.3 — исправление вкладок
++
++Проблема: в листе колонии Foundry v13 на некоторых клиентах отображается дерево технологий сразу под шапкой, но пропадает панель переходов.
++
++Исправление: `<nav>` заменён на отдельный `<div role="tablist">` с теми же десятью кнопками; CSS принудительно делает панель видимой и позволяет горизонтальную прокрутку.
++
++## Проверка
++
++1. Создайте резервную копию мира.
++2. Остановите Foundry; замените `Data/systems/project-genesis` папкой из полного ZIP.
++3. Запустите тестовый мир Foundry v13 и откройте лист актора типа `Колония`.
++4. Проверьте наличие меню «Обзор», «Инвентарь», «Контейнеры», «Исследования», «Чертежи», «Производство», «Строительство», «Энергия и сети», «Экипаж и логистика», «Журнал операций».
++5. Нажмите каждую вкладку; только выбранная страница должна отображаться, активная вкладка выделяется.
++6. При уменьшении ширины прокручивайте навигацию горизонтально.
++
++Внимание: изменение проверено статическими тестами и тестами Node.js; работа в реальном Foundry v13 должна быть проверена пользователем.
+--- /dev/null
++++ b/TESTING_0.8.4_RU.md
+@@ -0,0 +1,13 @@
++# PROJECT GENESIS 0.8.4 — вкладки и личный инвентарь
++
++Сделайте резервную копию мира; установите полную сборку поверх прежней системы. НЕ удаляйте данные мира.
++
++1. Откройте актёра «Колония». В шапке между названием и игровым днём должен быть выпадающий список «Раздел» и кнопка «Общий склад».
++2. Поочерёдно выберите 10 разделов через выпадающий список. Должна быть видна только одна страница.
++3. Проверьте переключение через горизонтальные вкладки. Выбор должен синхронизироваться в выпадающем списке.
++4. Откройте актёра типа «Выживший» (survivor). На обзоре отображается блок «Личный инвентарь выжившего» с загрузкой, а в шапке — кнопка «Инвентарь».
++5. Нажмите «Открыть инвентарь», затем «+ Добавить предмет» и проверьте отображение количества, массы и объёма.
++6. Если кнопка неактивна у игрока, проверьте права Owner на актёра; у GM доступ есть.
++7. При новом запуске лист должен открываться с обзора без показа двух страниц одновременно.
++
++Ограничение: тесты Node.js и браузерный предпросмотр не заменяют полноценный запуск Foundry VTT v13.
+--- /dev/null
++++ b/TESTING_0.8.5_RU.md
+@@ -0,0 +1,13 @@
++# PROJECT GENESIS v0.8.5 — стабильность перехода суток и интерфейса
++
++Исправлены пять замечаний аудита основного репозитория (данные мира не удаляются):
++
++1. Переход суток сохраняет полный план `dayOperation` в world settings **до** списания и записывает абсолютные итоги по предметам, выжившим и очередям. Повтор операции не расходует припасы второй раз. После сбоя ведущий повторяет `+1 сутки` либо следующий запуск GM автоматически возобновляет операцию. Пока она не завершена, другие игровые команды блокируются.
++2. Кнопка вложения очков теперь блокируется при отсутствии мастерской / лаборатории, электропитания, предыдущих исследований или свободных очков. Причина видна под кнопкой и в подсказке.
++3. Фильтр технологий сбрасывает выбранную карточку на первую видимую; пустая выдача показывает сообщение.
++4. В диалоге перемещения назначение подписано типом (общий склад / выживший / NPC GM), а чужой выживший поясняется как доступный только получатель.
++5. Лист показывает реальную версию `game.system.version`, а не зашитый номер.
++
++Содержит интерфейсные улучшения 0.8.3–0.8.4 для навигации и личного инвентаря. Для теста сделайте резервную копию мира.
++
++Тесты: `node --test tests/*.test.mjs`; пакет: `python scripts/package_release.py`.
+--- a/genesis.mjs
++++ b/genesis.mjs
+@@ -29,6 +29,7 @@
+   sheetConfig.registerSheet(Item,ID,GenesisItemSheet,{types:['material','gear','tool','component','consumable','container'],makeDefault:true,label:'PROJECT GENESIS — предмет'});
+   game.settings.register(ID,'worldDay',{name:'День экспедиции',scope:'world',config:false,type:Number,default:1});
+   game.settings.register(ID,'logisticsJournal',{name:'Журнал логистики',scope:'world',config:false,type:Object,default:{entries:[],processed:[]}});
++  game.settings.register(ID,'dayOperation',{name:'Незавершённый переход суток',scope:'world',config:false,type:Object,default:{}});
+   CONFIG.projectGenesis={abilities:ABILITIES,skills:SKILLS,technologies:TECHNOLOGIES};
+   validateCatalog();
+   validateIndustryCatalog();
+@@ -41,5 +42,5 @@
+   initializeNetworks();
+   initializeCrew();
+   game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement};
+-  console.info('PROJECT GENESIS v0.8.1 ready');
++  console.info('PROJECT GENESIS v0.8.4 ready');
+ });
+--- /dev/null
++++ b/module/day-operation.mjs
+@@ -0,0 +1,51 @@
++/** Durable, replayable world-day plan. Produces absolute target values, never relative debits. */
++import {qty,dayVitals,LIMITS} from './rules.mjs';
++import {tickQueue} from './industry-rules.mjs';
++import {crewJob} from './crew-rules.mjs';
++
++const copy = value => JSON.parse(JSON.stringify(value));
++
++/** Compute once before any write. Shared colony food/water can feed only one survivor per unit. */
++export function planDayOperation(survivors,colony,day){
++  if(!Number.isSafeInteger(day)||day<1||day>=9999999)throw Error('Некорректный игровой день.');
++  const inventory=new Map();
++  for(const actor of [...survivors,...(colony?[colony]:[])]){
++    if(inventory.has(actor.id))continue;
++    const rows=[];
++    for(const item of actor.items||[]){
++      if(item.type==='container')continue;
++      const code=String(item.system?.resourceCode||'').trim().toLowerCase();
++      if(code==='food'||code==='water')rows.push({id:item.id,code,original:qty(item),remaining:qty(item)});
++    }
++    inventory.set(actor.id,rows);
++  }
++  const survival=[];
++  for(const actor of survivors){
++    const supplied={};
++    for(const [code,required] of Object.entries({food:LIMITS.foodPerDay,water:LIMITS.waterPerDay})){
++      const sourceIds=[actor.id,...(colony&&colony.id!==actor.id?[colony.id]:[])];
++      const stacks=sourceIds.flatMap(id=>(inventory.get(id)||[]).filter(item=>item.code===code));
++      const available=stacks.reduce((sum,item)=>sum+item.remaining,0);
++      supplied[code]=available>=required;
++      if(!supplied[code])continue; // do not partially consume unavailable rations
++      let left=required;
++      for(const item of stacks){
++        const consumed=Math.min(left,item.remaining);
++        item.remaining-=consumed;
++        left-=consumed;
++        if(!left)break;
++      }
++    }
++    survival.push({actorId:actor.id,values:copy(dayVitals(actor.system.survival,supplied.food,supplied.water))});
++    survival.at(-1).fed=supplied.food;
++    survival.at(-1).hydrated=supplied.water;
++  }
++  const items=[...inventory].map(([actorId,rows])=>({actorId,
++    updates:rows.filter(row=>row.remaining!==row.original).map(row=>({id:row.id,quantity:row.remaining}))
++  })).filter(row=>row.updates.length);
++  return {
++    version:1,day,nextDay:day+1,colonyId:colony?.id||'',items,survival,
++    industry:colony?copy(tickQueue(colony.system.industry)):null,
++    crewJobs:colony?copy((colony.system.crew?.jobs||[]).map(row=>crewJob(row,day))):null
++  };
++}
+--- a/module/logistics.mjs
++++ b/module/logistics.mjs
+@@ -1,14 +1,21 @@
+ /** Serialized, GM-coordinated logistics for cooperative tables. */
+ import { validateMove, qty, stackSignature, dayVitals, LIMITS } from './rules.mjs';
+-import { advanceIndustryDay } from './industry.mjs';
++import { planDayOperation } from './day-operation.mjs';
+ const SYSTEM = 'project-genesis';
+ let sequence = Promise.resolve();
+ const seenThisSession = new Set();
+ const awaiting = new Map();
+ const AWAIT_TIMEOUT_MS = 60_000;
+ const MAX_STACK = 999_999;
+-export function withWorldLock(fn) {
+-  const next = sequence.then(fn, fn);
++export function withWorldLock(fn,{allowDayRecovery=false}={}) {
++  const guarded=()=>{
++    const pending=game.settings?.get?.(SYSTEM,'dayOperation');
++    if(!allowDayRecovery && pending?.version===1 &&
++        game.settings.get(SYSTEM,'worldDay')===pending.day)
++      throw new Error('Переход суток прерван. Сначала повторите «+1 сутки» для безопасного завершения.');
++    return fn();
++  };
++  const next = sequence.then(guarded, guarded);
+   sequence = next.catch(() => undefined);
+   return next;
+ }
+@@ -147,50 +154,79 @@
+   }
+   return {fed:results.food, hydrated:results.water, changes};
+ }
+-async function spendDailySupplies(survivor,colony) {
+-  const {fed,hydrated,changes}=planDailyConsumption(survivor,colony);
+-  const applied=[];
+-  try {
+-    for (const [actor,updates] of changes) {
+-      await actor.updateEmbeddedDocuments('Item',updates.map(row=>({_id:row.id,'system.quantity':row.after})));
+-      applied.push({actor,updates});
+-    }
+-  } catch (error) {
+-    for (const {actor,updates} of applied.reverse()) {
+-      try {await actor.updateEmbeddedDocuments('Item',updates.map(row=>({_id:row.id,'system.quantity':row.before})));}
+-      catch (rollbackError) {
+-        console.error('PROJECT GENESIS: failed to roll back daily supplies', {error,rollbackError});
+-        throw new Error('Ошибка восстановления суточных ресурсов. Проверьте запасы вручную.');
++/** Apply a persisted immutable plan. Every write sets an absolute value, so replay is safe. */
++async function replayDayOperation(plan){
++  const current=game.settings.get(SYSTEM,'worldDay');
++  if(current===plan.nextDay){
++    // The day was committed, but the cleanup may have failed or the GM restarted.
++    await game.settings.set(SYSTEM,'dayOperation',{});
++    return {day:plan.nextDay,recovered:true};
++  }
++  if(current!==plan.day)throw Error('Номер суток не соответствует незавершённой операции. Обратитесь к ведущему.');
++  for(const {actorId,updates} of plan.items){
++    const actor=game.actors.get(actorId);
++    if(!actor)throw Error(`Отсутствует владелец суточных ресурсов (${actorId}).`);
++    for(const row of updates)if(!actor.items.get(row.id))
++      throw Error(`Предмет ${row.id} удалён во время незавершённого перехода суток.`);
++    await actor.updateEmbeddedDocuments('Item',updates.map(row=>({_id:row.id,'system.quantity':row.quantity})));
++  }
++  for(const row of plan.survival){
++    const actor=game.actors.get(row.actorId);
++    if(!actor)throw Error(`Не найден выживший ${row.actorId} в сохранённой операции суток.`);
++    await actor.update({'system.survival':row.values});
++  }
++  if(plan.colonyId){
++    const colony=game.actors.get(plan.colonyId);
++    if(!colony)throw Error('Колония из сохранённой операции суток не найдена.');
++    if(plan.industry?.jobs?.length || plan.industry?.construction?.length)
++      await colony.update({'system.industry.jobs':plan.industry.jobs,
++        'system.industry.construction':plan.industry.construction});
++    if(plan.crewJobs?.length)await colony.update({'system.crew.jobs':plan.crewJobs});
++  }
++  // The world day acts as the final commit marker. Everything above is replayable.
++  await game.settings.set(SYSTEM,'worldDay',plan.nextDay);
++  try{await game.settings.set(SYSTEM,'dayOperation',{});}
++  catch(error){console.warn('PROJECT GENESIS: committed day journal cleanup will be retried',error);}
++  const messages=plan.survival.map(row=>{
++    const name=game.actors.get(row.actorId)?.name||row.actorId;
++    return `${name}: ${row.fed?'еда ✓':'нет еды'}; ${row.hydrated?'вода ✓':'нет воды'}`;
++  });
++  try{await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · День ${plan.nextDay}</strong><pre>${foundry.utils.escapeHTML(messages.join('\n'))}</pre></div>`});}
++  catch(error){console.warn('PROJECT GENESIS: day notification failed',error);}
++  notification(`Наступил день ${plan.nextDay}.`);
++  return {day:plan.nextDay,recovered:false};
++}
++export async function advanceDay() {
++  if(!game.user.isGM)return notification('Только ведущий может перевести сутки.',true);
++  if(gmLeader()?.id!==game.user.id)return notification('Сутки может переводить только ведущий, управляющий логистикой.',true);
++  try{
++    return await withWorldLock(async()=>{
++      let plan=game.settings.get(SYSTEM,'dayOperation');
++      if(plan?.version!==1){
++        const current=game.settings.get(SYSTEM,'worldDay');
++        plan=planDayOperation(game.actors.filter(a=>a.type==='survivor'),
++          game.actors.find(a=>a.type==='colony'),current);
++        // Persist the full plan before the first side effect.
++        await game.settings.set(SYSTEM,'dayOperation',plan);
+       }
+-    }
+-    throw error;
+-  }
+-  return {fed,hydrated};
+-}
+-export async function advanceDay() {
+-  if (!game.user.isGM) return notification('Только ведущий может перевести сутки.',true);
+-  if (gmLeader()?.id !== game.user.id) return notification('Сутки может переводить только ведущий, управляющий логистикой.',true);
+-  await withWorldLock(async ()=>{
+-    const current = game.settings.get(SYSTEM,'worldDay');
+-    const colony = game.actors.find(a=>a.type === 'colony');
+-    const messages=[];
+-    for (const actor of game.actors.filter(a=>a.type==='survivor')) {
+-      const {fed,hydrated} = await spendDailySupplies(actor,colony);
+-      const changes = dayVitals(actor.system.survival,fed,hydrated);
+-      await actor.update({'system.survival':changes});
+-      messages.push(`${actor.name}: ${fed?'еда ✓':'нет еды'}; ${hydrated?'вода ✓':'нет воды'}`);
+-    }
+-    if(colony) {
+-      await advanceIndustryDay(colony);
+-      const {advanceCrewDay}=await import('./crew.mjs');
+-      await advanceCrewDay(colony);
+-    }
+-    await game.settings.set(SYSTEM,'worldDay',current+1);
+-    await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · День ${current+1}</strong><pre>${foundry.utils.escapeHTML(messages.join('\n'))}</pre></div>`});
+-    notification(`Наступил день ${current+1}.`);
+-  });
++      return replayDayOperation(plan);
++    },{allowDayRecovery:true});
++  }catch(error){
++    console.error('PROJECT GENESIS: incomplete day operation retained for retry',error);
++    notification(`Не удалось завершить сутки: ${error.message}. Повторите действие после устранения ошибки.`,true);
++    return {ok:false,error:error.message};
++  }
+ }
+ export function initializeLogistics() {
++  // Reconnect recovery must enter the same serialized lock before gameplay requests.
++  if(game.user?.isGM && gmLeader()?.id===game.user.id){
++    const pending=game.settings?.get?.(SYSTEM,'dayOperation');
++    if(pending?.version===1){
++      void withWorldLock(()=>replayDayOperation(pending),{allowDayRecovery:true})
++        .catch(error=>{console.error('PROJECT GENESIS: day recovery failed',error);
++          notification('Переход суток требует восстановления. Нажмите «+1 сутки» после исправления ошибки.',true);});
++    }
++  }
+   game.socket.on(`system.${SYSTEM}`,(request)=>{
+     if (!request || typeof request !== 'object') return;
+     if (request.kind==='transfer-result') {
+--- a/module/research.mjs
++++ b/module/research.mjs
+@@ -19,7 +19,20 @@
+ export function researchContext(colony, user) {
+   if(!colony)return {available:false};
+   const science=colony.system.science;
+-  const statusMap=Object.fromEntries(TECHNOLOGIES.map(t=>[t.id,techStatus(t.id,science,colony.items)]));
++  const statusMap=Object.fromEntries(TECHNOLOGIES.map(t=>{
++    const status=techStatus(t.id,science,colony.items);
++    const powerReady=t.facilities.every(id=>stationOperational(colony,id));
++    const remaining=Math.max(0,t.rp-status.progress);
++    const investBlockedReason=status.unlocked?'Технология уже изучена.':
++      !status.prerequisitesReady?'Сначала изучите предыдущие технологии.':
++      !status.facilityReady?'Необходимая лаборатория или мастерская отсутствует.':
++      !powerReady?'Требуемая инфраструктура обесточена.':
++      !remaining?'Исследование уже полностью профинансировано.':
++      !science.points?'Нет свободных очков исследований.':'';
++    return [t.id,{...status,powerReady,canInvest:!investBlockedReason,
++      canWork:!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
++      canFinish:status.canFinish&&powerReady,investBlockedReason}];
++  }));
+   const eras=[0,1,2,3,4].map(t=>({tier:t,label:['01 · ПОЛЕВОЙ ЭТАП','02 · РЕМЕСЛО','03 · НАУЧНАЯ БАЗА','04 · ПРОМЫШЛЕННОСТЬ','05 · КОСМОС'][t],nodes:TECHNOLOGIES.filter(x=>x.t===t).map(x=>({
+     ...x,...statusMap[x.id],branchLabel:BRANCHES[x.branch],shortParent:x.parents.length,
+     statusLabel:statusMap[x.id].unlocked?'Изучено':statusMap[x.id].canFinish?'Готово к открытию':statusMap[x.id].missingParents.length?'Заблокировано':`${statusMap[x.id].progress}/${x.rp} ОИ`
+--- a/module/sheets.mjs
++++ b/module/sheets.mjs
+@@ -34,11 +34,13 @@
+ }
+ async function askTransfer(actor,item){
+   const options=[];
+-  for(const a of game.actors.filter(a=>['survivor','colony','npc'].includes(a.type))){
+-    if(a.type==='npc' && !game.user.isGM) continue;
+-    options.push(opt(`${a.id}|`,`${a.name} — основной отсек`));
++  for(const a of game.actors.filter(a=>a.type==='colony'||a.type==='survivor'||(a.type==='npc'&&game.user.isGM))){
++    const kind=a.type==='colony'?'Общий склад колонии':a.type==='npc'?'NPC (GM)':'Выживший';
++    const access=game.user.isGM||a.type==='colony'||a.testUserPermission(game.user,'OWNER');
++    const label=access?'':' · чужой персонаж (только получение)';
++    options.push(opt(`${a.id}|`,`${kind}: ${a.name} — основной отсек${label}`));
+     for(const c of a.items.filter(i=>i.type==='container')){
+-      options.push(opt(`${a.id}|${c.id}`,`${a.name} — ${c.name}`));
++      options.push(opt(`${a.id}|${c.id}`,`${kind}: ${a.name} — ${c.name}${label}`));
+     }
+   }
+   if(!options.length){ui.notifications.warn('Нет доступных получателей.');return;}
+@@ -354,7 +356,7 @@
+       worldDay:game.settings.get('project-genesis','worldDay'),
+       journal:recentOperations().slice(0,25),
+       colony:game.actors.find(a=>a.type==='colony'),
+-      tab:this._genesisTab,
++      tab:this._genesisTab,systemVersion:game.system.version,
+       research:researchContext(colonyFor(actor),game.user),
+       industry:industryContext(actor,game.user),
+       networks:networkContext(actor,game.user),
+@@ -370,7 +372,12 @@
+     const selectTab=(name)=>{
+       this._genesisTab=name;
+       root.querySelectorAll('[data-genesis-page]').forEach(el=>{el.hidden=el.dataset.genesisPage!==name;});
+-      root.querySelectorAll('[data-genesis-tab]').forEach(el=>{el.classList.toggle('active',el.dataset.genesisTab===name);});
++      root.querySelectorAll('[data-genesis-tab]').forEach(el=>{
++        const selected=el.dataset.genesisTab===name;
++        el.classList.toggle('active',selected);
++        el.setAttribute('aria-selected',String(selected));
++      });
++      root.querySelectorAll('[data-genesis-quick-nav]').forEach(el=>{el.value=name;});
+     };
+     selectTab(this._genesisTab);
+     const board=root.querySelector('[data-genesis-tech-board]');
+@@ -378,11 +385,15 @@
+       if(!board)return;
+       board.style.zoom=String(this._techZoom);
+       const query=this._techQuery.trim().toLocaleLowerCase();
++      const visible=[];
+       for(const card of board.querySelectorAll('[data-genesis-tech-card]')){
+         const branchMatch=this._techFilter==='all'||card.dataset.genesisTechBranch===this._techFilter;
+         const textMatch=!query||card.textContent.toLocaleLowerCase().includes(query);
+         card.hidden=!(branchMatch&&textMatch);
++        if(!card.hidden)visible.push(card.dataset.genesisTechCard);
+       }
++      if(!visible.includes(this._techSelected))this._techSelected=visible[0]||'';
++      root.querySelector('[data-genesis-tech-empty]')?.toggleAttribute('hidden',visible.length>0);
+       root.querySelectorAll('[data-genesis-tech-filter]').forEach(b=>b.classList.toggle('active',b.dataset.genesisTechFilter===this._techFilter));
+       root.querySelectorAll('[data-genesis-tech-detail]').forEach(d=>{d.hidden=d.dataset.genesisTechDetail!==this._techSelected;});
+       root.querySelectorAll('[data-genesis-tech-card]').forEach(c=>c.classList.toggle('is-selected',c.dataset.genesisTechCard===this._techSelected));
+@@ -402,6 +413,15 @@
+     },eventOptions);
+     // One delegated handler per event type instead of O(number of items) listeners.
+     root.addEventListener('change',event=>{
++      const quickNav=event.target.closest?.('[data-genesis-quick-nav]');
++      if(quickNav){
++        const target=quickNav.value;
++        if(root.querySelector(`[data-genesis-page="${target}"]`)){
++          selectTab(target);
++          if(target==='research')applyView();
++        }
++        return;
++      }
+       const prioritySelect=event.target.closest?.('[data-network-priority]');
+       if(prioritySelect){
+         void requestNetwork({action:'priority',colonyId:prioritySelect.dataset.colonyId,
+@@ -414,6 +434,12 @@
+         ['abilities','skills','survival','biography','specialization','notes','capacity','biome','name']);
+     },eventOptions);
+     root.addEventListener('click',async event=>{
++      const shortcut=event.target.closest?.('[data-genesis-open-tab]');
++      if(shortcut){
++        const target=shortcut.dataset.genesisOpenTab;
++        if(root.querySelector(`[data-genesis-page="${target}"]`)) selectTab(target);
++        return;
++      }
+       const tab=event.target.closest?.('[data-genesis-tab]');
+       if (tab) {selectTab(tab.dataset.genesisTab);if(tab.dataset.genesisTab==='research')applyView();return;}
+       const techCard=event.target.closest?.('[data-genesis-tech-card]');
+--- a/styles/genesis.css
++++ b/styles/genesis.css
+@@ -176,3 +176,54 @@
+ .genesis-crew-chips span{font-size:11px;color:#c8ead8;background:#2b4746;border:1px solid #446a5d;border-radius:4px;padding:4px 6px;}
+ .genesis-resource-ghost{font-size:12px;font-weight:700;text-align:center;color:white;text-shadow:0 1px 4px #000;}
+ @media(max-width:720px){.genesis-crew-summary{grid-template-columns:1fr 1fr 1fr}.genesis-crew-site-grid{grid-template-columns:1fr}}
++
++/* v0.8.3: keep tab navigation visible across Foundry v13 themes.
++   Avoid the generic <nav> styling of themes and other modules. */
++.genesis .genesis-layout > .genesis-tabbar {
++  display: flex !important;
++  flex: 0 0 auto !important;
++  position: relative;
++  visibility: visible !important;
++  opacity: 1 !important;
++  min-height: 48px;
++  width: 100%;
++  max-width: 100%;
++  overflow-x: auto;
++  overflow-y: hidden;
++  scrollbar-width: thin;
++  z-index: 2;
++  box-sizing: border-box;
++}
++.genesis .genesis-tabbar > [data-genesis-tab] {
++  display: inline-flex !important;
++  flex: 0 0 auto;
++  justify-content: center;
++  align-items: center;
++  white-space: nowrap;
++  min-height: 46px;
++  opacity: 1 !important;
++  visibility: visible !important;
++  cursor: pointer;
++}
++.genesis .genesis-tabbar > [data-genesis-tab][aria-selected="true"] {
++  background: #21363d;
++  color: var(--pg-accent);
++  border-bottom-color: var(--pg-accent);
++}
++
++/* v0.8.4: reliable navigation fallback inside the always-visible banner */
++.genesis .genesis-banner {flex-wrap:wrap;}
++.genesis .genesis-header-controls {display:flex!important;align-items:flex-end;gap:9px;flex:0 1 300px;min-width:200px;visibility:visible!important;opacity:1!important;}
++.genesis .genesis-header-switcher {display:flex!important;flex-direction:column;gap:4px;min-width:0;flex:1;margin:0!important;color:#d4e6dc;font-size:11px;}
++.genesis .genesis-header-switcher select {display:block!important;width:100%;max-width:100%;padding:7px 9px!important;min-height:36px;opacity:1!important;visibility:visible!important;cursor:pointer;}
++.genesis .genesis-header-inventory {display:inline-flex!important;align-items:center;justify-content:center;min-height:36px;white-space:nowrap;padding:7px 10px;visibility:visible!important;opacity:1!important;}
++.genesis .genesis-inventory-summary {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
++.genesis .genesis-inventory-summary h2 {margin:0 0 6px;}
++.genesis .genesis-inventory-summary p {margin:0;}
++.genesis .genesis-inventory-summary button {flex:0 0 auto;}
++.genesis .genesis-layout > [data-genesis-page][hidden] {display:none!important;}
++@media(max-width:730px) {
++ .genesis .genesis-header-controls{flex:1 1 100%;order:3;min-width:100%;}
++ .genesis .genesis-day{margin-left:auto;}
++ .genesis .genesis-tabbar > [data-genesis-tab]{min-height:40px;}
++}
+--- a/system.json
++++ b/system.json
+@@ -2,7 +2,7 @@
+   "id": "project-genesis",
+   "title": "PROJECT GENESIS",
+   "description": "Самостоятельная RPG-система: выживание на необитаемой планете, исследования, строительство на карте, инженерные сети, добыча, ручной труд и логистика экипажа.",
+-  "version": "0.8.2",
++  "version": "0.8.5",
+   "compatibility": {
+     "minimum": "13",
+     "verified": "13",
+@@ -55,5 +55,5 @@
+   "secondaryTokenAttribute": "survival.oxygen",
+   "url": "https://github.com/Danacra/project-genesis",
+   "manifest": "https://github.com/Danacra/project-genesis/releases/latest/download/system.json",
+-  "download": "https://github.com/Danacra/project-genesis/releases/download/v0.8.2/project-genesis.zip"
++  "download": "https://github.com/Danacra/project-genesis/releases/download/v0.8.5/project-genesis.zip"
+ }
+--- a/templates/actor.hbs
++++ b/templates/actor.hbs
+@@ -3,20 +3,37 @@
+     <div class="genesis-portrait"><img src="{{actor.img}}" data-action="editImage" data-edit="img" alt="" title="Изменить портрет"></div>
+     <div class="genesis-heading"><span class="genesis-kicker">PROJECT GENESIS / EXPEDITION ARCHIVE</span>
+       <h1>{{actor.name}}</h1><div class="genesis-muted">{{#if isColony}}Колония и общий склад{{else}}Карточка выжившего · {{actor.system.specialization}}{{/if}}</div></div>
++    <div class="genesis-header-controls">
++      <label class="genesis-header-switcher">Раздел
++        <select data-genesis-quick-nav aria-label="Перейти к разделу листа">
++          <option value="overview">Обзор</option>
++          <option value="inventory">{{#if isColony}}Общий склад{{else}}Инвентарь выжившего{{/if}}</option>
++          <option value="containers">Контейнеры</option>
++          <option value="research">Исследования</option>
++          <option value="blueprints">Чертежи</option>
++          <option value="production">Производство</option>
++          <option value="construction">Строительство</option>
++          <option value="networks">Энергия и сети</option>
++          <option value="crew">Экипаж и логистика</option>
++          <option value="history">Журнал операций</option>
++        </select>
++      </label>
++      <button type="button" class="genesis-header-inventory" data-genesis-open-tab="inventory">{{#if isColony}}Общий склад{{else}}Инвентарь{{/if}}</button>
++    </div>
+     <div class="genesis-day"><span>ДЕНЬ</span><strong>{{worldDay}}</strong>{{#if isGM}}<button type="button" data-genesis-action="day" title="Потратить запасы и перейти к следующим суткам">+1 сутки</button>{{/if}}</div>
+   </div>
+-  <nav class="genesis-nav" aria-label="Разделы">
+-    <button type="button" data-genesis-tab="overview">Обзор</button>
+-    <button type="button" data-genesis-tab="inventory">Инвентарь</button>
+-    <button type="button" data-genesis-tab="containers">Контейнеры</button>
+-    <button type="button" data-genesis-tab="research">Исследования</button>
+-    <button type="button" data-genesis-tab="blueprints">Чертежи</button>
+-    <button type="button" data-genesis-tab="production">Производство</button>
+-    <button type="button" data-genesis-tab="construction">Строительство</button>
+-    <button type="button" data-genesis-tab="networks">Энергия и сети</button>
+-    <button type="button" data-genesis-tab="crew">Экипаж и логистика</button>
+-    <button type="button" data-genesis-tab="history">Журнал операций</button>
+-  </nav>
++  <div class="genesis-nav genesis-tabbar" role="tablist" aria-label="Разделы PROJECT GENESIS" data-genesis-navigation>
++    <button type="button" data-genesis-tab="overview" role="tab">Обзор</button>
++    <button type="button" data-genesis-tab="inventory" role="tab">Инвентарь</button>
++    <button type="button" data-genesis-tab="containers" role="tab">Контейнеры</button>
++    <button type="button" data-genesis-tab="research" role="tab">Исследования</button>
++    <button type="button" data-genesis-tab="blueprints" role="tab">Чертежи</button>
++    <button type="button" data-genesis-tab="production" role="tab">Производство</button>
++    <button type="button" data-genesis-tab="construction" role="tab">Строительство</button>
++    <button type="button" data-genesis-tab="networks" role="tab">Энергия и сети</button>
++    <button type="button" data-genesis-tab="crew" role="tab">Экипаж и логистика</button>
++    <button type="button" data-genesis-tab="history" role="tab">Журнал операций</button>
++  </div>
+   <div class="genesis-content" data-genesis-page="overview">
+     {{#if isColony}}
+       <div class="genesis-panel"><h2>Колония</h2><div class="genesis-form-grid">
+@@ -41,10 +58,15 @@
+       <div class="genesis-panel"><h2>Профиль</h2><div class="genesis-form-grid"><label>Специализация<input data-genesis-field="specialization" value="{{actor.system.specialization}}" {{#unless editable}}disabled{{/unless}}></label></div>
+         <label>Биография<textarea data-genesis-field="biography" rows="3" {{#unless editable}}disabled{{/unless}}>{{actor.system.biography}}</textarea></label></div>
+     {{/if}}
++    <div class="genesis-panel genesis-inventory-summary">
++      <div><h2>{{#if isColony}}Общий склад колонии{{else}}Личный инвентарь выжившего{{/if}}</h2>
++      <p class="genesis-muted">Масса {{load.mass}} / {{cap.mass}} кг · Объём {{load.volume}} / {{cap.volume}} л · Предметов {{totalItems}}</p></div>
++      <button type="button" class="genesis-primary" data-genesis-open-tab="inventory">{{#if isColony}}Открыть склад{{else}}Открыть инвентарь{{/if}}</button>
++    </div>
+     <div class="genesis-panel"><h2>Журнал исследователя</h2><textarea data-genesis-field="notes" rows="3" placeholder="Открытия, важные наблюдения, задачи..." {{#unless editable}}disabled{{/unless}}>{{actor.system.notes}}</textarea></div>
+   </div>
+   <div class="genesis-content" data-genesis-page="inventory" hidden>
+-    <div class="genesis-toolbar"><div><h2>Материалы и оборудование</h2><p class="genesis-muted">Строгий учёт массы и объёма для всех перемещений</p></div>
++    <div class="genesis-toolbar"><div><h2>{{#if isColony}}Общий склад колонии{{else}}Личный инвентарь выжившего{{/if}}</h2><p class="genesis-muted">Материалы и оборудование · учёт массы и объёма</p></div>
+       {{#if editable}}<button type="button" data-genesis-action="create" class="genesis-primary">+ Добавить предмет</button>{{/if}}</div>
+     <div class="genesis-capacity"><span><strong>{{load.mass}}</strong> / {{cap.mass}} кг</span><span><strong>{{load.volume}}</strong> / {{cap.volume}} л</span><span>{{totalItems}} ед.</span></div>
+     <div class="genesis-tablewrap"><table class="genesis-table"><thead><tr><th>Название</th><th>Количество</th><th>Масса</th><th>Объём</th><th>Место</th><th></th></tr></thead>
+@@ -95,6 +117,7 @@
+           </div>
+         </div>
+         <aside class="genesis-tech-inspector" aria-label="Подробности исследования">
++          <p class="genesis-muted" data-genesis-tech-empty hidden>По заданному фильтру технологии не найдены.</p>
+           {{#each research.details}}
+           <section data-genesis-tech-detail="{{id}}" hidden>
+             <span class="genesis-kicker">{{branchLabel}} · ЭПОХА {{epochDisplay}}</span><h3>{{name}}</h3>
+@@ -108,18 +131,18 @@
+               {{#if missingParentNames.length}}<p class="genesis-tech-alert">Требуются: {{#each missingParentNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+               {{#if requiredFacilityNames.length}}<h4>Оборудование</h4><p>{{#each requiredFacilityNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+               {{#if missingFacilityNames.length}}<p class="genesis-tech-alert">Отсутствует: {{#each missingFacilityNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
++              {{#unless powerReady}}<p class="genesis-tech-alert">Требуемая инфраструктура обесточена. Проверьте раздел «Энергия и сети».</p>{{/unless}}
+               {{#if materials.length}}<h4>Материалы на открытие</h4>
+                 <ul class="genesis-tech-materials">{{#each materials}}<li class="{{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></li>{{/each}}</ul>
+                 <small class="genesis-muted">Материалы списываются со склада колонии только при завершении открытия.</small>{{/if}}
+               {{#if ../research.canResearch}}
+-                {{#if prerequisitesReady}}
+-                  {{#if facilityReady}}
+-                    {{#if remaining}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
+-                  {{/if}}
+-                  {{#if remaining}}<button type="button" data-genesis-action="invest" data-tech-id="{{id}}">Вложить очки</button>{{/if}}
+-                  {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить открытие</button>{{/if}}
+-                  {{#unless remaining}}<p class="genesis-muted">Финансирование завершено. Выполните остальные требования.</p>{{/unless}}
++                {{#if canWork}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
++                {{#if remaining}}
++                  <button type="button" data-genesis-action="invest" data-tech-id="{{id}}" {{#unless canInvest}}disabled title="{{investBlockedReason}}"{{/unless}}>Вложить очки</button>
++                  {{#if investBlockedReason}}<p class="genesis-tech-alert" role="status">{{investBlockedReason}}</p>{{/if}}
+                 {{/if}}
++                {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить открытие</button>{{/if}}
++                {{#unless remaining}}<p class="genesis-muted">Финансирование завершено. Выполните остальные требования.</p>{{/unless}}
+               {{/if}}
+             {{/if}}
+             <h4>Открываемые чертежи</h4>
+@@ -317,5 +340,5 @@
+     <h2>Логистика экспедиции</h2><p class="genesis-muted">Последние 25 подтверждённых перемещений · доступно игрокам и ведущему</p>
+     <div class="genesis-log">{{#each journal}}<article><span>День {{day}}</span><strong>{{quantity}} × {{item}}</strong><small>{{from}} → {{to}} · {{location}} · {{user}}</small></article>{{else}}<div class="genesis-empty">Операций пока нет.</div>{{/each}}</div>
+   </div>
+-  <footer class="genesis-footer">PG / SYSTEM 0.8.1 <span>EXPLORE · RESEARCH · REBUILD</span></footer>
++  <footer class="genesis-footer">PG / SYSTEM {{systemVersion}} <span>EXPLORE · RESEARCH · REBUILD</span></footer>
+ </section>
+--- /dev/null
++++ b/tests/audit-ux-085.test.mjs
+@@ -0,0 +1,35 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {readFileSync} from 'node:fs';
++import {researchContext} from '../module/research.mjs';
++const template=readFileSync(new URL('../templates/actor.hbs',import.meta.url),'utf8');
++const sheet=readFileSync(new URL('../module/sheets.mjs',import.meta.url),'utf8');
++test('infrastructure-dependent investment button uses server-compatible check',()=>{
++  const colony={id:'c',name:'Base',type:'colony',items:[],system:{science:{unlocked:['survey','shelter','stone-tools'],points:10,facilities:[],projects:[],dailyWork:[],discoveries:[]},industry:{placements:[]}}};
++  const user={isGM:true};globalThis.game={actors:{filter:()=>[]},settings:{get:()=>1}};
++  let c=researchContext(colony,user);
++  assert.equal(c.statusMap['basic-workshop'].canInvest,false);
++  assert.match(c.statusMap['basic-workshop'].investBlockedReason,/мастерская/);
++  colony.system.science.facilities.push('bench');
++  c=researchContext(colony,user);
++  assert.equal(c.statusMap['basic-workshop'].canInvest,true);
++  assert.equal(c.statusMap['basic-workshop'].investBlockedReason,'');
++  colony.system.science.points=0;
++  c=researchContext(colony,user);
++  assert.equal(c.statusMap['basic-workshop'].canInvest,false);
++  assert.match(c.statusMap['basic-workshop'].investBlockedReason,/свободных очков/);
++});
++test('filter automatically selects a visible technology or empty state',()=>{
++  assert.match(sheet,/if\(!visible\.includes\(this\._techSelected\)\)this\._techSelected=visible\[0\]\|\|''/);
++  assert.match(sheet,/\[data-genesis-tech-empty\]/);
++  assert.match(template,/data-genesis-tech-empty/);
++});
++test('transfer destination distinguishes colony and non-owned survivor',()=>{
++  assert.match(sheet,/Общий склад колонии/);
++  assert.match(sheet,/чужой персонаж \(только получение\)/);
++  assert.match(sheet,/a\.type==='npc'&&game\.user\.isGM/);
++});
++test('footer uses real game system version rather than a literal build number',()=>{
++  assert.match(sheet,/systemVersion:game\.system\.version/);
++  assert.match(template,/PG \/ SYSTEM \{\{systemVersion\}\}/);
++});
+--- /dev/null
++++ b/tests/day-recovery-085.test.mjs
+@@ -0,0 +1,119 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {planDayOperation} from '../module/day-operation.mjs';
++import {advanceDay, withWorldLock, initializeLogistics} from '../module/logistics.mjs';
++
++const clone = x => structuredClone(x);
++function makeActor(id,type,stocks=[],jobData=null){
++  const rows=stocks.map(([code,amount],i)=>({id:`${id}-${code}-${i}`,type:'material',system:{resourceCode:code,quantity:amount}}));
++  const items={values:rows,get(k){return rows.find(i=>i.id===k);},[Symbol.iterator](){return rows.values()}};
++  const actor={id,name:id,type,items,system:type==='survivor'?{
++    survival:{health:100,hunger:0,thirst:0,fatigue:0,oxygen:100}
++  }:{industry:{jobs:jobData?[{id:'factory',remaining:3}]:[],construction:[]},crew:{jobs:jobData?[{id:'carrier',remaining:3,lastAdvancedDay:0}]:[]}},
++  async updateEmbeddedDocuments(_kind,changes){
++    for(const change of changes){
++      const item=items.get(change._id); if(!item) throw Error('missing item');
++      item.system.quantity=change['system.quantity'];
++    }
++  },
++  async update(changes){
++    if(this.failOnce){this.failOnce=false;throw Error('simulated mid-day write fault');}
++    for(const [key,value] of Object.entries(changes)){
++      if(key==='system.survival')this.system.survival=clone(value);
++      else if(key.startsWith('system.industry.'))this.system.industry[key.slice('system.industry.'.length)]=clone(value);
++      else if(key.startsWith('system.crew.'))this.system.crew[key.slice('system.crew.'.length)]=clone(value);
++      else throw Error('unexpected patch '+key);
++    }
++  }};
++  return actor;
++}
++function scenario({survivors=2,food=1,water=3,industry=true}={}){
++  const gm={id:'gm',name:'GM',isGM:true,active:true},actors=[...Array(survivors)].map((_,i)=>makeActor(`surv${i}`, 'survivor'));
++  const colony=makeActor('colony','colony',[['food',food],['water',water]],industry);
++  actors.push(colony);
++  const ledger={worldDay:1,dayOperation:{}};const errors=[],messages=[];
++  globalThis.game={user:gm,system:{version:'0.8.5'},
++    users:Object.assign([gm],{filter:fn=>[gm].filter(fn),get:id=>id==='gm'?gm:null}),
++    actors:{get:id=>actors.find(a=>a.id===id),find:fn=>actors.find(fn),filter:fn=>actors.filter(fn)},
++    settings:{get:(_ns,k)=>ledger[k],async set(_ns,k,v){ledger[k]=clone(v);}},
++    socket:{on(){}}};
++  globalThis.ui={notifications:{info:m=>messages.push(m),error:m=>errors.push(m)}};
++  globalThis.ChatMessage={create:async row=>messages.push(row)};
++  globalThis.foundry={utils:{escapeHTML:x=>x}};
++  return {actors,colony,ledger,errors,messages};
++}
++test('planner allocates shared colony rations only once across survivors',()=>{
++  const x=scenario();
++  const plan=planDayOperation(x.actors.filter(a=>a.type==='survivor'),x.colony,1);
++  assert.deepEqual(plan.survival.map(r=>[r.fed,r.hydrated]),[[true,true],[false,false]]);
++  assert.deepEqual(plan.items.flatMap(r=>r.updates.map(u=>u.quantity)),[0,1]);
++  assert.equal(x.colony.items.get('colony-food-0').system.quantity,1,'planning must not mutate world');
++  assert.equal(plan.industry.jobs[0].remaining,2);
++  assert.equal(plan.crewJobs[0].remaining,2);
++});
++test('failed write midway leaves journal and retry applies immutable targets once',async()=>{
++  const x=scenario({survivors:2,food:2,water:4});
++  x.colony.failOnce=true;
++  const first=await advanceDay();
++  assert.equal(first.ok,false);
++  assert.equal(x.ledger.worldDay,1);
++  assert.equal(x.ledger.dayOperation.version,1);
++  assert.equal(x.colony.items.get('colony-food-0').system.quantity,0);
++  const vital=clone(x.actors[0].system.survival);
++  const next=await advanceDay();
++  assert.equal(next.day,2);
++  assert.equal(x.ledger.worldDay,2);
++  assert.deepEqual(x.ledger.dayOperation,{});
++  assert.deepEqual(x.actors[0].system.survival,vital);
++  assert.equal(x.colony.items.get('colony-food-0').system.quantity,0);
++  assert.equal(x.colony.system.industry.jobs[0].remaining,2);
++  assert.equal(x.colony.system.crew.jobs[0].remaining,2);
++  assert.equal(x.errors.length,1);
++});
++test('committed day with failed cleanup does not advance or debit twice on retry',async()=>{
++  const x=scenario({survivors:1,food:2,water:5});
++  const original=x.ledger;
++  const settings=globalThis.game.settings;
++  const oldSet=settings.set;
++  let fail=true;
++  settings.set=async(ns,k,v)=>{
++    if(k==='dayOperation' && v.version!==1 && fail && original.worldDay===2){fail=false;throw Error('cleanup failed');}
++    return oldSet(ns,k,v);
++  };
++  const first=await advanceDay();
++  assert.equal(first.day,2);
++  assert.equal(original.dayOperation.version,1);
++  const foodAfter=x.colony.items.get('colony-food-0').system.quantity;
++  const second=await advanceDay();
++  assert.equal(second.recovered,true);
++  assert.equal(original.worldDay,2);
++  assert.equal(x.colony.items.get('colony-food-0').system.quantity,foodAfter);
++  assert.deepEqual(original.dayOperation,{});
++});
++test('other commands blocked while unfinished day operation exists',async()=>{
++  const x=scenario();
++  x.ledger.dayOperation=planDayOperation(x.actors.filter(a=>a.type==='survivor'),x.colony,1);
++  await assert.rejects(withWorldLock(async()=>42),/Сначала повторите/);
++});
++test('journal persistence fault before side effects leaves inventory unchanged',async()=>{
++  const x=scenario();
++  const set=globalThis.game.settings.set;let once=true;
++  globalThis.game.settings.set=async(ns,k,v)=>{
++    if(once&&k==='dayOperation'){once=false;throw Error('cannot save operation');}
++    return set(ns,k,v);
++  };
++  await advanceDay();
++  assert.equal(x.ledger.worldDay,1);
++  assert.equal(x.colony.items.get('colony-food-0').system.quantity,1);
++  assert.deepEqual(x.ledger.dayOperation,{});
++});
++test('GM initialization automatically resumes an unfinished day operation',async()=>{
++  const x=scenario({survivors:1,food:1,water:2});
++  const plan=planDayOperation(x.actors.filter(a=>a.type==='survivor'),x.colony,1);
++  x.ledger.dayOperation=clone(plan);
++  initializeLogistics();
++  await new Promise(resolve=>setImmediate(resolve));
++  assert.equal(x.ledger.worldDay,2);
++  assert.deepEqual(x.ledger.dayOperation,{});
++  assert.equal(x.colony.items.get('colony-food-0').system.quantity,0);
++});
+--- /dev/null
++++ b/tests/navigation-084.test.mjs
+@@ -0,0 +1,33 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {readFileSync} from 'node:fs';
++const template=readFileSync(new URL('../templates/actor.hbs',import.meta.url),'utf8');
++const sheet=readFileSync(new URL('../module/sheets.mjs',import.meta.url),'utf8');
++const styles=readFileSync(new URL('../styles/genesis.css',import.meta.url),'utf8');
++const keys=['overview','inventory','containers','research','blueprints','production','construction','networks','crew','history'];
++test('fallback quick navigator is always in banner',()=>{
++  assert.equal((template.match(/data-genesis-quick-nav/g)||[]).length,1);
++  const header=template.split('class="genesis-banner"')[1].split('</div>\n  <div class="genesis-nav')[0];
++  assert.match(header,/data-genesis-quick-nav/);
++});
++test('every quick navigator option maps to a page',()=>{
++  for(const key of keys){
++    assert.equal((template.match(new RegExp('<option value="'+key+'"','g'))||[]).length,1,key);
++    assert.equal((template.match(new RegExp('data-genesis-page="'+key+'"','g'))||[]).length,1,key);
++  }
++});
++test('inventory is available for both survivor and colony',()=>{
++  assert.match(template,/Личный инвентарь выжившего/);
++  assert.match(template,/Общий склад колонии/);
++  assert.match(template,/data-genesis-open-tab="inventory"/);
++  assert.match(template,/data-genesis-action="create"/);
++});
++test('dropdown synchronizes selection and accepts changes',()=>{
++  assert.match(sheet,/root.querySelectorAll\('\[data-genesis-quick-nav\]'\)\.forEach/);
++  assert.match(sheet,/const quickNav=event.target.closest\?\.\('\[data-genesis-quick-nav\]'\)/);
++  assert.match(sheet,/selectTab\(target\)/);
++});
++test('inventory shortcut uses same navigation logic',()=>{
++  assert.match(sheet,/const shortcut=event.target.closest\?\.\('\[data-genesis-open-tab\]'\)/);
++  assert.match(styles,/genesis-header-controls/);
++});
+--- a/tests/startup.test.mjs
++++ b/tests/startup.test.mjs
+@@ -23,7 +23,7 @@
+   hooks.init();
+   assert.deepEqual(Object.keys(CONFIG.Actor.dataModels),['survivor','npc','colony']);
+   assert.deepEqual(Object.keys(CONFIG.Item.dataModels),['material','gear','tool','component','consumable','container']);
+-  assert.deepEqual(registered,[['project-genesis','worldDay'],['project-genesis','logisticsJournal']]);
++  assert.deepEqual(registered,[['project-genesis','worldDay'],['project-genesis','logisticsJournal'],['project-genesis','dayOperation']]);
+ });
+ test('colony includes research fields but retains legacy science points/tier',()=>{
+   const schema=CONFIG.Actor.dataModels.colony.defineSchema();
+--- /dev/null
++++ b/tests/tabs-083.test.mjs
+@@ -0,0 +1,25 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++const template=readFileSync(new URL('../templates/actor.hbs',import.meta.url),'utf8');
++const css=readFileSync(new URL('../styles/genesis.css',import.meta.url),'utf8');
++const sheet=readFileSync(new URL('../module/sheets.mjs',import.meta.url),'utf8');
++const keys=['overview','inventory','containers','research','blueprints','production','construction','networks','crew','history'];
++test('navigation is a generic tablist rather than a nav element',()=>{
++  assert.match(template,/<div class="genesis-nav genesis-tabbar" role="tablist"[^>]*data-genesis-navigation>/);
++  assert.doesNotMatch(template,/<nav class="genesis-nav"/);
++});
++test('all 10 tab buttons exist once',()=>{
++  for(const key of keys)assert.equal((template.match(new RegExp('data-genesis-tab="'+key+'"','g'))||[]).length,1,key);
++});
++test('all pages exist once',()=>{
++  for(const key of keys)assert.equal((template.match(new RegExp('data-genesis-page="'+key+'"','g'))||[]).length,1,key);
++});
++test('navigation is forced visible',()=>{
++  assert.match(css,/\.genesis \.genesis-layout > \.genesis-tabbar[\s\S]*?display: flex !important/);
++  assert.match(css,/\.genesis \.genesis-tabbar > \[data-genesis-tab\]/);
++});
++test('button selection updates aria state and page visibility',()=>{
++  assert.match(sheet,/el\.setAttribute\('aria-selected',String\(selected\)\)/);
++  assert.match(sheet,/el\.hidden=el\.dataset\.genesisPage!==name/);
++});

@@ -3,20 +3,37 @@
     <div class="genesis-portrait"><img src="{{actor.img}}" data-action="editImage" data-edit="img" alt="" title="Изменить портрет"></div>
     <div class="genesis-heading"><span class="genesis-kicker">PROJECT GENESIS / EXPEDITION ARCHIVE</span>
       <h1>{{actor.name}}</h1><div class="genesis-muted">{{#if isColony}}Колония и общий склад{{else}}Карточка выжившего · {{actor.system.specialization}}{{/if}}</div></div>
+    <div class="genesis-header-controls">
+      <label class="genesis-header-switcher">Раздел
+        <select data-genesis-quick-nav aria-label="Перейти к разделу листа">
+          <option value="overview">Обзор</option>
+          <option value="inventory">{{#if isColony}}Общий склад{{else}}Инвентарь выжившего{{/if}}</option>
+          <option value="containers">Контейнеры</option>
+          <option value="research">Исследования</option>
+          <option value="blueprints">Чертежи</option>
+          <option value="production">Производство</option>
+          <option value="construction">Строительство</option>
+          <option value="networks">Энергия и сети</option>
+          <option value="crew">Экипаж и логистика</option>
+          <option value="history">Журнал операций</option>
+        </select>
+      </label>
+      <button type="button" class="genesis-header-inventory" data-genesis-open-tab="inventory">{{#if isColony}}Общий склад{{else}}Инвентарь{{/if}}</button>
+    </div>
     <div class="genesis-day"><span>ДЕНЬ</span><strong>{{worldDay}}</strong>{{#if isGM}}<button type="button" data-genesis-action="day" title="Потратить запасы и перейти к следующим суткам">+1 сутки</button>{{/if}}</div>
   </div>
-  <nav class="genesis-nav" aria-label="Разделы">
-    <button type="button" data-genesis-tab="overview">Обзор</button>
-    <button type="button" data-genesis-tab="inventory">Инвентарь</button>
-    <button type="button" data-genesis-tab="containers">Контейнеры</button>
-    <button type="button" data-genesis-tab="research">Исследования</button>
-    <button type="button" data-genesis-tab="blueprints">Чертежи</button>
-    <button type="button" data-genesis-tab="production">Производство</button>
-    <button type="button" data-genesis-tab="construction">Строительство</button>
-    <button type="button" data-genesis-tab="networks">Энергия и сети</button>
-    <button type="button" data-genesis-tab="crew">Экипаж и логистика</button>
-    <button type="button" data-genesis-tab="history">Журнал операций</button>
-  </nav>
+  <div class="genesis-nav genesis-tabbar" role="tablist" aria-label="Разделы PROJECT GENESIS" data-genesis-navigation>
+    <button type="button" data-genesis-tab="overview" role="tab">Обзор</button>
+    <button type="button" data-genesis-tab="inventory" role="tab">Инвентарь</button>
+    <button type="button" data-genesis-tab="containers" role="tab">Контейнеры</button>
+    <button type="button" data-genesis-tab="research" role="tab">Исследования</button>
+    <button type="button" data-genesis-tab="blueprints" role="tab">Чертежи</button>
+    <button type="button" data-genesis-tab="production" role="tab">Производство</button>
+    <button type="button" data-genesis-tab="construction" role="tab">Строительство</button>
+    <button type="button" data-genesis-tab="networks" role="tab">Энергия и сети</button>
+    <button type="button" data-genesis-tab="crew" role="tab">Экипаж и логистика</button>
+    <button type="button" data-genesis-tab="history" role="tab">Журнал операций</button>
+  </div>
   <div class="genesis-content" data-genesis-page="overview">
     {{#if isColony}}
       <div class="genesis-panel"><h2>Колония</h2><div class="genesis-form-grid">
@@ -41,10 +58,15 @@
       <div class="genesis-panel"><h2>Профиль</h2><div class="genesis-form-grid"><label>Специализация<input data-genesis-field="specialization" value="{{actor.system.specialization}}" {{#unless editable}}disabled{{/unless}}></label></div>
         <label>Биография<textarea data-genesis-field="biography" rows="3" {{#unless editable}}disabled{{/unless}}>{{actor.system.biography}}</textarea></label></div>
     {{/if}}
+    <div class="genesis-panel genesis-inventory-summary">
+      <div><h2>{{#if isColony}}Общий склад колонии{{else}}Личный инвентарь выжившего{{/if}}</h2>
+      <p class="genesis-muted">Масса {{load.mass}} / {{cap.mass}} кг · Объём {{load.volume}} / {{cap.volume}} л · Предметов {{totalItems}}</p></div>
+      <button type="button" class="genesis-primary" data-genesis-open-tab="inventory">{{#if isColony}}Открыть склад{{else}}Открыть инвентарь{{/if}}</button>
+    </div>
     <div class="genesis-panel"><h2>Журнал исследователя</h2><textarea data-genesis-field="notes" rows="3" placeholder="Открытия, важные наблюдения, задачи..." {{#unless editable}}disabled{{/unless}}>{{actor.system.notes}}</textarea></div>
   </div>
   <div class="genesis-content" data-genesis-page="inventory" hidden>
-    <div class="genesis-toolbar"><div><h2>Материалы и оборудование</h2><p class="genesis-muted">Строгий учёт массы и объёма для всех перемещений</p></div>
+    <div class="genesis-toolbar"><div><h2>{{#if isColony}}Общий склад колонии{{else}}Личный инвентарь выжившего{{/if}}</h2><p class="genesis-muted">Материалы и оборудование · учёт массы и объёма</p></div>
       {{#if editable}}<button type="button" data-genesis-action="create" class="genesis-primary">+ Добавить предмет</button>{{/if}}</div>
     <div class="genesis-capacity"><span><strong>{{load.mass}}</strong> / {{cap.mass}} кг</span><span><strong>{{load.volume}}</strong> / {{cap.volume}} л</span><span>{{totalItems}} ед.</span></div>
     <div class="genesis-tablewrap"><table class="genesis-table"><thead><tr><th>Название</th><th>Количество</th><th>Масса</th><th>Объём</th><th>Место</th><th></th></tr></thead>
@@ -95,6 +117,7 @@
           </div>
         </div>
         <aside class="genesis-tech-inspector" aria-label="Подробности исследования">
+          <p class="genesis-muted" data-genesis-tech-empty hidden>По заданному фильтру технологии не найдены.</p>
           {{#each research.details}}
           <section data-genesis-tech-detail="{{id}}" hidden>
             <span class="genesis-kicker">{{branchLabel}} · ЭПОХА {{epochDisplay}}</span><h3>{{name}}</h3>
@@ -108,18 +131,18 @@
               {{#if missingParentNames.length}}<p class="genesis-tech-alert">Требуются: {{#each missingParentNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
               {{#if requiredFacilityNames.length}}<h4>Оборудование</h4><p>{{#each requiredFacilityNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
               {{#if missingFacilityNames.length}}<p class="genesis-tech-alert">Отсутствует: {{#each missingFacilityNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+              {{#unless powerReady}}<p class="genesis-tech-alert">Требуемая инфраструктура обесточена. Проверьте раздел «Энергия и сети».</p>{{/unless}}
               {{#if materials.length}}<h4>Материалы на открытие</h4>
                 <ul class="genesis-tech-materials">{{#each materials}}<li class="{{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></li>{{/each}}</ul>
                 <small class="genesis-muted">Материалы списываются со склада колонии только при завершении открытия.</small>{{/if}}
               {{#if ../research.canResearch}}
-                {{#if prerequisitesReady}}
-                  {{#if facilityReady}}
-                    {{#if remaining}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
-                  {{/if}}
-                  {{#if remaining}}<button type="button" data-genesis-action="invest" data-tech-id="{{id}}">Вложить очки</button>{{/if}}
-                  {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить открытие</button>{{/if}}
-                  {{#unless remaining}}<p class="genesis-muted">Финансирование завершено. Выполните остальные требования.</p>{{/unless}}
+                {{#if canWork}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
+                {{#if remaining}}
+                  <button type="button" data-genesis-action="invest" data-tech-id="{{id}}" {{#unless canInvest}}disabled title="{{investBlockedReason}}"{{/unless}}>Вложить очки</button>
+                  {{#if investBlockedReason}}<p class="genesis-tech-alert" role="status">{{investBlockedReason}}</p>{{/if}}
                 {{/if}}
+                {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить открытие</button>{{/if}}
+                {{#unless remaining}}<p class="genesis-muted">Финансирование завершено. Выполните остальные требования.</p>{{/unless}}
               {{/if}}
             {{/if}}
             <h4>Открываемые чертежи</h4>
@@ -317,5 +340,5 @@
     <h2>Логистика экспедиции</h2><p class="genesis-muted">Последние 25 подтверждённых перемещений · доступно игрокам и ведущему</p>
     <div class="genesis-log">{{#each journal}}<article><span>День {{day}}</span><strong>{{quantity}} × {{item}}</strong><small>{{from}} → {{to}} · {{location}} · {{user}}</small></article>{{else}}<div class="genesis-empty">Операций пока нет.</div>{{/each}}</div>
   </div>
-  <footer class="genesis-footer">PG / SYSTEM 0.8.1 <span>EXPLORE · RESEARCH · REBUILD</span></footer>
+  <footer class="genesis-footer">PG / SYSTEM {{systemVersion}} <span>EXPLORE · RESEARCH · REBUILD</span></footer>
 </section>

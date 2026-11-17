@@ -1,14 +1,21 @@
 /** Serialized, GM-coordinated logistics for cooperative tables. */
 import { validateMove, qty, stackSignature, dayVitals, LIMITS } from './rules.mjs';
-import { advanceIndustryDay } from './industry.mjs';
+import { planDayOperation } from './day-operation.mjs';
 const SYSTEM = 'project-genesis';
 let sequence = Promise.resolve();
 const seenThisSession = new Set();
 const awaiting = new Map();
 const AWAIT_TIMEOUT_MS = 60_000;
 const MAX_STACK = 999_999;
-export function withWorldLock(fn) {
-  const next = sequence.then(fn, fn);
+export function withWorldLock(fn,{allowDayRecovery=false}={}) {
+  const guarded=()=>{
+    const pending=game.settings?.get?.(SYSTEM,'dayOperation');
+    if(!allowDayRecovery && pending?.version===1 &&
+        game.settings.get(SYSTEM,'worldDay')===pending.day)
+      throw new Error('Переход суток прерван. Сначала повторите «+1 сутки» для безопасного завершения.');
+    return fn();
+  };
+  const next = sequence.then(guarded, guarded);
   sequence = next.catch(() => undefined);
   return next;
 }
@@ -147,50 +154,79 @@ export function planDailyConsumption(survivor, colony) {
   }
   return {fed:results.food, hydrated:results.water, changes};
 }
-async function spendDailySupplies(survivor,colony) {
-  const {fed,hydrated,changes}=planDailyConsumption(survivor,colony);
-  const applied=[];
-  try {
-    for (const [actor,updates] of changes) {
-      await actor.updateEmbeddedDocuments('Item',updates.map(row=>({_id:row.id,'system.quantity':row.after})));
-      applied.push({actor,updates});
-    }
-  } catch (error) {
-    for (const {actor,updates} of applied.reverse()) {
-      try {await actor.updateEmbeddedDocuments('Item',updates.map(row=>({_id:row.id,'system.quantity':row.before})));}
-      catch (rollbackError) {
-        console.error('PROJECT GENESIS: failed to roll back daily supplies', {error,rollbackError});
-        throw new Error('Ошибка восстановления суточных ресурсов. Проверьте запасы вручную.');
-      }
-    }
-    throw error;
+/** Apply a persisted immutable plan. Every write sets an absolute value, so replay is safe. */
+async function replayDayOperation(plan){
+  const current=game.settings.get(SYSTEM,'worldDay');
+  if(current===plan.nextDay){
+    // The day was committed, but the cleanup may have failed or the GM restarted.
+    await game.settings.set(SYSTEM,'dayOperation',{});
+    return {day:plan.nextDay,recovered:true};
   }
-  return {fed,hydrated};
+  if(current!==plan.day)throw Error('Номер суток не соответствует незавершённой операции. Обратитесь к ведущему.');
+  for(const {actorId,updates} of plan.items){
+    const actor=game.actors.get(actorId);
+    if(!actor)throw Error(`Отсутствует владелец суточных ресурсов (${actorId}).`);
+    for(const row of updates)if(!actor.items.get(row.id))
+      throw Error(`Предмет ${row.id} удалён во время незавершённого перехода суток.`);
+    await actor.updateEmbeddedDocuments('Item',updates.map(row=>({_id:row.id,'system.quantity':row.quantity})));
+  }
+  for(const row of plan.survival){
+    const actor=game.actors.get(row.actorId);
+    if(!actor)throw Error(`Не найден выживший ${row.actorId} в сохранённой операции суток.`);
+    await actor.update({'system.survival':row.values});
+  }
+  if(plan.colonyId){
+    const colony=game.actors.get(plan.colonyId);
+    if(!colony)throw Error('Колония из сохранённой операции суток не найдена.');
+    if(plan.industry?.jobs?.length || plan.industry?.construction?.length)
+      await colony.update({'system.industry.jobs':plan.industry.jobs,
+        'system.industry.construction':plan.industry.construction});
+    if(plan.crewJobs?.length)await colony.update({'system.crew.jobs':plan.crewJobs});
+  }
+  // The world day acts as the final commit marker. Everything above is replayable.
+  await game.settings.set(SYSTEM,'worldDay',plan.nextDay);
+  try{await game.settings.set(SYSTEM,'dayOperation',{});}
+  catch(error){console.warn('PROJECT GENESIS: committed day journal cleanup will be retried',error);}
+  const messages=plan.survival.map(row=>{
+    const name=game.actors.get(row.actorId)?.name||row.actorId;
+    return `${name}: ${row.fed?'еда ✓':'нет еды'}; ${row.hydrated?'вода ✓':'нет воды'}`;
+  });
+  try{await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · День ${plan.nextDay}</strong><pre>${foundry.utils.escapeHTML(messages.join('\n'))}</pre></div>`});}
+  catch(error){console.warn('PROJECT GENESIS: day notification failed',error);}
+  notification(`Наступил день ${plan.nextDay}.`);
+  return {day:plan.nextDay,recovered:false};
 }
 export async function advanceDay() {
-  if (!game.user.isGM) return notification('Только ведущий может перевести сутки.',true);
-  if (gmLeader()?.id !== game.user.id) return notification('Сутки может переводить только ведущий, управляющий логистикой.',true);
-  await withWorldLock(async ()=>{
-    const current = game.settings.get(SYSTEM,'worldDay');
-    const colony = game.actors.find(a=>a.type === 'colony');
-    const messages=[];
-    for (const actor of game.actors.filter(a=>a.type==='survivor')) {
-      const {fed,hydrated} = await spendDailySupplies(actor,colony);
-      const changes = dayVitals(actor.system.survival,fed,hydrated);
-      await actor.update({'system.survival':changes});
-      messages.push(`${actor.name}: ${fed?'еда ✓':'нет еды'}; ${hydrated?'вода ✓':'нет воды'}`);
-    }
-    if(colony) {
-      await advanceIndustryDay(colony);
-      const {advanceCrewDay}=await import('./crew.mjs');
-      await advanceCrewDay(colony);
-    }
-    await game.settings.set(SYSTEM,'worldDay',current+1);
-    await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · День ${current+1}</strong><pre>${foundry.utils.escapeHTML(messages.join('\n'))}</pre></div>`});
-    notification(`Наступил день ${current+1}.`);
-  });
+  if(!game.user.isGM)return notification('Только ведущий может перевести сутки.',true);
+  if(gmLeader()?.id!==game.user.id)return notification('Сутки может переводить только ведущий, управляющий логистикой.',true);
+  try{
+    return await withWorldLock(async()=>{
+      let plan=game.settings.get(SYSTEM,'dayOperation');
+      if(plan?.version!==1){
+        const current=game.settings.get(SYSTEM,'worldDay');
+        plan=planDayOperation(game.actors.filter(a=>a.type==='survivor'),
+          game.actors.find(a=>a.type==='colony'),current);
+        // Persist the full plan before the first side effect.
+        await game.settings.set(SYSTEM,'dayOperation',plan);
+      }
+      return replayDayOperation(plan);
+    },{allowDayRecovery:true});
+  }catch(error){
+    console.error('PROJECT GENESIS: incomplete day operation retained for retry',error);
+    notification(`Не удалось завершить сутки: ${error.message}. Повторите действие после устранения ошибки.`,true);
+    return {ok:false,error:error.message};
+  }
 }
 export function initializeLogistics() {
+  // Reconnect recovery must enter the same serialized lock before gameplay requests.
+  if(game.user?.isGM && gmLeader()?.id===game.user.id){
+    const pending=game.settings?.get?.(SYSTEM,'dayOperation');
+    if(pending?.version===1){
+      void withWorldLock(()=>replayDayOperation(pending),{allowDayRecovery:true})
+        .catch(error=>{console.error('PROJECT GENESIS: day recovery failed',error);
+          notification('Переход суток требует восстановления. Нажмите «+1 сутки» после исправления ошибки.',true);});
+    }
+  }
   game.socket.on(`system.${SYSTEM}`,(request)=>{
     if (!request || typeof request !== 'object') return;
     if (request.kind==='transfer-result') {

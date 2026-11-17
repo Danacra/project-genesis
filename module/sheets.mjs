@@ -34,11 +34,13 @@ function containerContexts(actor, inventory){
 }
 async function askTransfer(actor,item){
   const options=[];
-  for(const a of game.actors.filter(a=>['survivor','colony','npc'].includes(a.type))){
-    if(a.type==='npc' && !game.user.isGM) continue;
-    options.push(opt(`${a.id}|`,`${a.name} — основной отсек`));
+  for(const a of game.actors.filter(a=>a.type==='colony'||a.type==='survivor'||(a.type==='npc'&&game.user.isGM))){
+    const kind=a.type==='colony'?'Общий склад колонии':a.type==='npc'?'NPC (GM)':'Выживший';
+    const access=game.user.isGM||a.type==='colony'||a.testUserPermission(game.user,'OWNER');
+    const label=access?'':' · чужой персонаж (только получение)';
+    options.push(opt(`${a.id}|`,`${kind}: ${a.name} — основной отсек${label}`));
     for(const c of a.items.filter(i=>i.type==='container')){
-      options.push(opt(`${a.id}|${c.id}`,`${a.name} — ${c.name}`));
+      options.push(opt(`${a.id}|${c.id}`,`${kind}: ${a.name} — ${c.name}${label}`));
     }
   }
   if(!options.length){ui.notifications.warn('Нет доступных получателей.');return;}
@@ -354,7 +356,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       worldDay:game.settings.get('project-genesis','worldDay'),
       journal:recentOperations().slice(0,25),
       colony:game.actors.find(a=>a.type==='colony'),
-      tab:this._genesisTab,
+      tab:this._genesisTab,systemVersion:game.system.version,
       research:researchContext(colonyFor(actor),game.user),
       industry:industryContext(actor,game.user),
       networks:networkContext(actor,game.user),
@@ -370,7 +372,12 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     const selectTab=(name)=>{
       this._genesisTab=name;
       root.querySelectorAll('[data-genesis-page]').forEach(el=>{el.hidden=el.dataset.genesisPage!==name;});
-      root.querySelectorAll('[data-genesis-tab]').forEach(el=>{el.classList.toggle('active',el.dataset.genesisTab===name);});
+      root.querySelectorAll('[data-genesis-tab]').forEach(el=>{
+        const selected=el.dataset.genesisTab===name;
+        el.classList.toggle('active',selected);
+        el.setAttribute('aria-selected',String(selected));
+      });
+      root.querySelectorAll('[data-genesis-quick-nav]').forEach(el=>{el.value=name;});
     };
     selectTab(this._genesisTab);
     const board=root.querySelector('[data-genesis-tech-board]');
@@ -378,11 +385,15 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       if(!board)return;
       board.style.zoom=String(this._techZoom);
       const query=this._techQuery.trim().toLocaleLowerCase();
+      const visible=[];
       for(const card of board.querySelectorAll('[data-genesis-tech-card]')){
         const branchMatch=this._techFilter==='all'||card.dataset.genesisTechBranch===this._techFilter;
         const textMatch=!query||card.textContent.toLocaleLowerCase().includes(query);
         card.hidden=!(branchMatch&&textMatch);
+        if(!card.hidden)visible.push(card.dataset.genesisTechCard);
       }
+      if(!visible.includes(this._techSelected))this._techSelected=visible[0]||'';
+      root.querySelector('[data-genesis-tech-empty]')?.toggleAttribute('hidden',visible.length>0);
       root.querySelectorAll('[data-genesis-tech-filter]').forEach(b=>b.classList.toggle('active',b.dataset.genesisTechFilter===this._techFilter));
       root.querySelectorAll('[data-genesis-tech-detail]').forEach(d=>{d.hidden=d.dataset.genesisTechDetail!==this._techSelected;});
       root.querySelectorAll('[data-genesis-tech-card]').forEach(c=>c.classList.toggle('is-selected',c.dataset.genesisTechCard===this._techSelected));
@@ -402,6 +413,15 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     },eventOptions);
     // One delegated handler per event type instead of O(number of items) listeners.
     root.addEventListener('change',event=>{
+      const quickNav=event.target.closest?.('[data-genesis-quick-nav]');
+      if(quickNav){
+        const target=quickNav.value;
+        if(root.querySelector(`[data-genesis-page="${target}"]`)){
+          selectTab(target);
+          if(target==='research')applyView();
+        }
+        return;
+      }
       const prioritySelect=event.target.closest?.('[data-network-priority]');
       if(prioritySelect){
         void requestNetwork({action:'priority',colonyId:prioritySelect.dataset.colonyId,
@@ -414,6 +434,12 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         ['abilities','skills','survival','biography','specialization','notes','capacity','biome','name']);
     },eventOptions);
     root.addEventListener('click',async event=>{
+      const shortcut=event.target.closest?.('[data-genesis-open-tab]');
+      if(shortcut){
+        const target=shortcut.dataset.genesisOpenTab;
+        if(root.querySelector(`[data-genesis-page="${target}"]`)) selectTab(target);
+        return;
+      }
       const tab=event.target.closest?.('[data-genesis-tab]');
       if (tab) {selectTab(tab.dataset.genesisTab);if(tab.dataset.genesisTab==='research')applyView();return;}
       const techCard=event.target.closest?.('[data-genesis-tech-card]');

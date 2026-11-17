@@ -19,7 +19,20 @@ export function colonyFor(actor) {
 export function researchContext(colony, user) {
   if(!colony)return {available:false};
   const science=colony.system.science;
-  const statusMap=Object.fromEntries(TECHNOLOGIES.map(t=>[t.id,techStatus(t.id,science,colony.items)]));
+  const statusMap=Object.fromEntries(TECHNOLOGIES.map(t=>{
+    const status=techStatus(t.id,science,colony.items);
+    const powerReady=t.facilities.every(id=>stationOperational(colony,id));
+    const remaining=Math.max(0,t.rp-status.progress);
+    const investBlockedReason=status.unlocked?'Технология уже изучена.':
+      !status.prerequisitesReady?'Сначала изучите предыдущие технологии.':
+      !status.facilityReady?'Необходимая лаборатория или мастерская отсутствует.':
+      !powerReady?'Требуемая инфраструктура обесточена.':
+      !remaining?'Исследование уже полностью профинансировано.':
+      !science.points?'Нет свободных очков исследований.':'';
+    return [t.id,{...status,powerReady,canInvest:!investBlockedReason,
+      canWork:!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
+      canFinish:status.canFinish&&powerReady,investBlockedReason}];
+  }));
   const eras=[0,1,2,3,4].map(t=>({tier:t,label:['01 · ПОЛЕВОЙ ЭТАП','02 · РЕМЕСЛО','03 · НАУЧНАЯ БАЗА','04 · ПРОМЫШЛЕННОСТЬ','05 · КОСМОС'][t],nodes:TECHNOLOGIES.filter(x=>x.t===t).map(x=>({
     ...x,...statusMap[x.id],branchLabel:BRANCHES[x.branch],shortParent:x.parents.length,
     statusLabel:statusMap[x.id].unlocked?'Изучено':statusMap[x.id].canFinish?'Готово к открытию':statusMap[x.id].missingParents.length?'Заблокировано':`${statusMap[x.id].progress}/${x.rp} ОИ`
