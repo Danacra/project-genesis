@@ -7,7 +7,12 @@ export const RESOURCE_NODES=Object.freeze({
   fiber:{name:'Растительное волокно',code:'fiber',mass:.3,volume:1,limit:500,days:1,skill:'survival'},
   ore:{name:'Рудная порода',code:'ore',mass:3,volume:2,limit:350,days:2,skill:'engineering'},
   clay:{name:'Глина',code:'clay',mass:1.5,volume:1.3,limit:350,days:1,skill:'survival'},
-  scrap:{name:'Обломки корабля',code:'scrap',mass:2,volume:2,limit:250,days:2,skill:'engineering'}
+  scrap:{name:'Обломки корабля',code:'scrap',mass:2,volume:2,limit:250,days:2,skill:'engineering'},
+  sample:{name:'Исследовательские образцы',code:'sample',mass:.25,volume:.4,limit:220,days:1,skill:'exploration'},
+  organic:{name:'Биологические образцы',code:'organic',mass:.5,volume:1,limit:320,days:1,skill:'survival'},
+  copper:{name:'Медная руда',code:'copper',mass:2,volume:1.5,limit:220,days:2,skill:'engineering'},
+  silicon:{name:'Кремнистая порода',code:'silicon',mass:1.5,volume:1,limit:160,days:2,skill:'engineering'},
+  crystal:{name:'Необычные кристаллы',code:'crystal',mass:.8,volume:.8,limit:140,days:3,skill:'exploration'}
 });
 const list=x=>Array.isArray(x)?x:[];
 export const MAX_CREW_JOBS=50,MAX_NODES=160,MAX_CACHES=160,MAX_CARGO=120;

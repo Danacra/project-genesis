@@ -12,6 +12,9 @@ import { BUILDING_FOOTPRINTS } from './module/map-rules.mjs';
 import {initializeNetworks,requestNetwork,NETWORK_TYPES} from './module/networks.mjs';
 import {startNetworkDrawing,cancelNetworkDrawing} from './module/network-drawing.mjs';
 import {initializeCrew,requestCrew,RESOURCE_NODES} from './module/crew.mjs';
+import {PLANET_ZONES,weatherForDay} from './module/planet.mjs';
+import {initializeRest,requestRest} from './module/rest.mjs';
+import {initializeMission,requestMission,missionStage} from './module/mission.mjs';
 import {startResourcePlacement,stopResourcePlacement} from './module/crew-placement.mjs';
 const ID = 'project-genesis';
 Hooks.once('init',()=>{
@@ -30,6 +33,7 @@ Hooks.once('init',()=>{
   game.settings.register(ID,'worldDay',{name:'День экспедиции',scope:'world',config:false,type:Number,default:1});
   game.settings.register(ID,'logisticsJournal',{name:'Журнал логистики',scope:'world',config:false,type:Object,default:{entries:[],processed:[]}});
   game.settings.register(ID,'dayOperation',{name:'Незавершённый переход суток',scope:'world',config:false,type:Object,default:{}});
+  game.settings.register(ID,'missionOperation',{name:'Незавершённая сборка корабля',scope:'world',config:false,type:Object,default:{}});
   CONFIG.projectGenesis={abilities:ABILITIES,skills:SKILLS,technologies:TECHNOLOGIES};
   validateCatalog();
   validateIndustryCatalog();
@@ -41,6 +45,8 @@ Hooks.once('ready',()=>{
   initializeIndustry();
   initializeNetworks();
   initializeCrew();
-  game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement};
-  console.info('PROJECT GENESIS v0.8.4 ready');
+  initializeRest();
+  initializeMission();
+  game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement,planetZones:PLANET_ZONES,weatherForDay,requestRest,requestMission,missionStage};
+  console.info(`PROJECT GENESIS v${game.system?.version || "development"} ready`);
 });

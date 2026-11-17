@@ -5,8 +5,8 @@ import {RESOURCE_NODES,cartBonus,carryCapacity,laborDays,journeyDays,changeStock
 const item=(code,quantity,mass=1,volume=1,type='material')=>({name:code,type,img:'',system:{resourceCode:code,quantity,unitMass:mass,unitVolume:volume,quality:0,techTier:0,description:''}});
 const survivor=(items=[])=>({id:'s',type:'survivor',system:{abilities:{strength:2},skills:{survival:2,engineering:1}},items});
 const scene=()=>({id:'planet',grid:{size:100,type:1},dimensions:{sceneRect:{x:0,y:0,width:2000,height:1600}},tiles:[],tokens:[{actorId:'s',x:100,y:100,width:1,height:1}]});
-test('six finite deposit classes with positive bounded mass and volume',()=>{
-  assert.equal(Object.keys(RESOURCE_NODES).length,6);
+test('eleven finite deposit classes with positive bounded mass and volume',()=>{
+  assert.equal(Object.keys(RESOURCE_NODES).length,11);
   for(const def of Object.values(RESOURCE_NODES))assert.ok(def.limit>=1&&def.mass>0&&def.volume>0);
 });
 test('basic carrying obeys original capacity; cart expands it and accelerates delivery',()=>{

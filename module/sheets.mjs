@@ -2,6 +2,9 @@ import { ABILITIES, SKILLS, ITEM_TYPES, measure, capacity, containerCapacity, it
   perQuantity, plus, fits, round, qty, checkResult, summarizeInventory } from './rules.mjs';
 import { requestTransfer, recentOperations, advanceDay } from './logistics.mjs';
 import { researchContext, colonyFor, requestResearch, TECHNOLOGIES } from './research.mjs';
+import {planetContext,PLANET_ZONES} from './planet.mjs';
+import {restContext,requestRest} from './rest.mjs';
+import {missionStage,requestMission} from './mission.mjs';
 import { industryContext, requestIndustry } from './industry.mjs';
 import { startPlacement, showPlacementOnScene } from './map-placement.mjs';
 import { networkContext, requestNetwork } from './networks.mjs';
@@ -346,8 +349,8 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
   async _prepareContext(options){
     const ctx=await super._prepareContext(options),actor=this.document;
     const cap=capacity(actor),inventory=summarizeInventory(actor.items),load=inventory.load;
-    const isColony=actor.type==='colony';
-    return {...ctx,actor,isColony,editable:actor.isOwner,isGM:game.user.isGM,
+    const isColony=actor.type==='colony',isSurvivor=actor.type==='survivor';
+    return {...ctx,actor,isColony,isSurvivor,editable:actor.isOwner,isGM:game.user.isGM,
       abilities:Object.entries(ABILITIES).map(([key,label])=>({key,label,value:fieldValue(actor,`abilities.${key}`)})),
       skills:Object.entries(SKILLS).map(([key,label])=>({key,label,value:fieldValue(actor,`skills.${key}`)})),
       vitals:!isColony?Object.entries(actor.system.survival).map(([key,value])=>({key,value,label:({health:'Здоровье',hunger:'Голод',thirst:'Жажда',fatigue:'Усталость',oxygen:'Кислород'})[key]})):[],
@@ -357,6 +360,10 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       journal:recentOperations().slice(0,25),
       colony:game.actors.find(a=>a.type==='colony'),
       tab:this._genesisTab,systemVersion:game.system.version,
+      planet:planetContext(colonyFor(actor),game.settings.get('project-genesis','worldDay')),
+      rest:{...restContext(actor,colonyFor(actor),game.settings.get('project-genesis','worldDay')),canAct:actor.isOwner},
+      mission:{...missionStage(colonyFor(actor),game.settings.get('project-genesis','worldDay')),
+        canAct:game.user.isGM || (game.actors.some(a=>a.type==='survivor'&&a.testUserPermission(game.user,'OWNER')))},
       research:researchContext(colonyFor(actor),game.user),
       industry:industryContext(actor,game.user),
       networks:networkContext(actor,game.user),
@@ -422,6 +429,14 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         }
         return;
       }
+      const environmentSelect=event.target.closest?.('[data-planet-zone]');
+      if(environmentSelect){
+        const colony=colonyFor(this.document);
+        if(game.user.isGM&&colony&&Object.hasOwn(PLANET_ZONES,environmentSelect.value)){
+          void withWorldLock(()=>colony.update({'system.environment.zone':environmentSelect.value})).catch(error=>ui.notifications.error(error.message));
+        }
+        return;
+      }
       const prioritySelect=event.target.closest?.('[data-network-priority]');
       if(prioritySelect){
         void requestNetwork({action:'priority',colonyId:prioritySelect.dataset.colonyId,
@@ -459,6 +474,8 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         else if(action==='container'&&this.document.isOwner)await askNewItem(this.document,true);
         else if(action==='roll'&&this.document.isOwner)await rollCheck(this.document,el.dataset.ability);
         else if(action==='day'&&game.user.isGM)await advanceDay();
+        else if(action==='rest'&&this.document.type==='survivor')await requestRest(this.document.id,el.dataset.restKind);
+        else if(action==='mission'){const colony=colonyFor(this.document);if(colony)await requestMission(colony.id);}
         else if(['work','invest','complete','facility','grant'].includes(action))await askResearch(this,action,el.dataset.techId,el.dataset.facilityId);
         else if(action==='industry'&&['start-building','place-existing'].includes(el.dataset.industryAction)){
           const colony=colonyFor(this.document);

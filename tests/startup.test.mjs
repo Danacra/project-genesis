@@ -23,7 +23,7 @@ test('system registers all type models and the existing game settings',()=>{
   hooks.init();
   assert.deepEqual(Object.keys(CONFIG.Actor.dataModels),['survivor','npc','colony']);
   assert.deepEqual(Object.keys(CONFIG.Item.dataModels),['material','gear','tool','component','consumable','container']);
-  assert.deepEqual(registered,[['project-genesis','worldDay'],['project-genesis','logisticsJournal'],['project-genesis','dayOperation']]);
+  assert.deepEqual(registered,[['project-genesis','worldDay'],['project-genesis','logisticsJournal'],['project-genesis','dayOperation'],['project-genesis','missionOperation']]);
 });
 test('colony includes research fields but retains legacy science points/tier',()=>{
   const schema=CONFIG.Actor.dataModels.colony.defineSchema();
@@ -33,10 +33,10 @@ test('colony includes research fields but retains legacy science points/tier',()
   assert.ok(schema.infrastructure.options.links && schema.infrastructure.options.processed);
   assert.ok(schema.crew.options.nodes && schema.crew.options.caches && schema.crew.options.jobs);
 });
-test('ready registers five world socket handlers and exposes crew api',()=>{
+test('ready registers seven world socket handlers and exposes crew api',()=>{
   hooks.ready();
-  assert.equal(listeners.length,5);
-  assert.equal(game.projectGenesis.recipes.length,26);
+  assert.equal(listeners.length,7);
+  assert.equal(game.projectGenesis.recipes.length,27);
   assert.equal(typeof game.projectGenesis.requestCrew,'function');
   assert.equal(game.projectGenesis.buildings.length,12);
   assert.equal(typeof game.projectGenesis.requestIndustry,'function');

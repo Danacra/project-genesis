@@ -14,7 +14,9 @@
           <option value="production">Производство</option>
           <option value="construction">Строительство</option>
           <option value="networks">Энергия и сети</option>
+          <option value="planet">Планета и погода</option>
           <option value="crew">Экипаж и логистика</option>
+          <option value="mission">Космическая программа</option>
           <option value="history">Журнал операций</option>
         </select>
       </label>
@@ -31,7 +33,9 @@
     <button type="button" data-genesis-tab="production" role="tab">Производство</button>
     <button type="button" data-genesis-tab="construction" role="tab">Строительство</button>
     <button type="button" data-genesis-tab="networks" role="tab">Энергия и сети</button>
+    <button type="button" data-genesis-tab="planet" role="tab">Планета</button>
     <button type="button" data-genesis-tab="crew" role="tab">Экипаж и логистика</button>
+    <button type="button" data-genesis-tab="mission" role="tab">Корабль</button>
     <button type="button" data-genesis-tab="history" role="tab">Журнал операций</button>
   </div>
   <div class="genesis-content" data-genesis-page="overview">
@@ -55,6 +59,16 @@
       <div class="genesis-panel"><h2>Состояние экспедиции</h2><div class="genesis-vitals">
       {{#each vitals}}<label class="genesis-vital"><span>{{label}}</span><progress value="{{value}}" max="100"></progress><input type="number" data-genesis-field="survival.{{key}}" value="{{value}}" min="0" max="100" step="1" {{#unless ../editable}}disabled{{/unless}}></label>{{/each}}
       </div><p class="genesis-footnote">Голод, жажда и усталость: 0 — лучшее состояние, 100 — критическое. Здоровье и кислород: 100 — максимум.</p></div>
+      {{#if isSurvivor}}<div class="genesis-panel"><h2>Отдых и восстановление</h2>
+        <p class="genesis-muted">Отдых доступен один раз за игровые сутки. Новые рабочие задания заблокированы при усталости от 85.</p>
+        <p>Усталость: <strong>{{rest.fatigue}} / 100</strong> · {{#if rest.shelter}}На базе есть жилой модуль{{else}}Жилой модуль ещё не построен{{/if}}</p>
+        {{#if rest.used}}<p class="genesis-tech-done">Сегодня персонаж уже отдыхал.</p>{{/if}}
+        {{#if rest.busy}}<p class="genesis-tech-alert">Персонаж занят рабочим заданием — завершите его перед отдыхом.</p>{{/if}}
+        <div class="genesis-network-actions">
+          <button type="button" data-genesis-action="rest" data-rest-kind="field" {{#unless rest.canAct}}disabled{{/unless}} {{#if rest.used}}disabled{{/if}} {{#if rest.busy}}disabled{{/if}}>Полевой отдых (−22 усталости)</button>
+          <button type="button" class="genesis-primary" data-genesis-action="rest" data-rest-kind="shelter" {{#unless rest.canAct}}disabled{{/unless}} {{#unless rest.shelter}}disabled{{/unless}} {{#if rest.used}}disabled{{/if}} {{#if rest.busy}}disabled{{/if}}>Сон в жилом модуле (−40 усталости)</button>
+        </div>
+      </div>{{/if}}
       <div class="genesis-panel"><h2>Профиль</h2><div class="genesis-form-grid"><label>Специализация<input data-genesis-field="specialization" value="{{actor.system.specialization}}" {{#unless editable}}disabled{{/unless}}></label></div>
         <label>Биография<textarea data-genesis-field="biography" rows="3" {{#unless editable}}disabled{{/unless}}>{{actor.system.biography}}</textarea></label></div>
     {{/if}}
@@ -187,7 +201,7 @@
           {{#if canCancel}}<button type="button" data-genesis-action="industry" data-industry-action="cancel" data-queue="jobs" data-job-id="{{id}}">Отменить</button>{{/if}}</article>
       {{else}}<p class="genesis-muted">Производственных заданий пока нет.</p>{{/each}}</div>
     </div>
-    <div class="genesis-panel"><div class="genesis-toolbar"><div><h3>Библиотека рецептов</h3><p class="genesis-muted">25 рецептов из древа технологий · стоимость указана на одну партию</p></div></div>
+    <div class="genesis-panel"><div class="genesis-toolbar"><div><h3>Библиотека рецептов</h3><p class="genesis-muted">27 рецептов из древа технологий · стоимость указана на одну партию</p></div></div>
       <div class="genesis-production-grid">{{#each industry.craft}}
       <article class="genesis-product-card {{#unless unlocked}}is-locked{{/unless}}">
         <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ИЗУЧЕНО{{else}}◇ ЗАКРЫТО{{/if}}</span><span class="genesis-product-duration">{{days}} сут./партия</span></div>
@@ -285,6 +299,18 @@
     <p class="genesis-footnote">Игровые условные единицы: энергостанция даёт 18 единиц мощности, исправная станция воды — до 12 единиц воды. Один материал на три клетки сети. В 0.7.1 есть ручное построение маршрута, ремонт за ресурсы и приоритеты. Нет физической гидравлики, электрических параметров и автоматической добычи топлива.</p>
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Создайте актора «Колония».</p></div>{{/if}}
   </div>
+  <div class="genesis-content" data-genesis-page="planet" hidden>
+    {{#if planet.available}}
+    <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / PLANETARY ENVIRONMENT</span>
+      <h2>Планета и погодные условия</h2><p class="genesis-muted">Погода детерминирована по игровым суткам и выбранному биому. Эффекты применяются только при переходе суток.</p></div></div>
+    <div class="genesis-panel"><h3>Территория: {{planet.zoneName}}</h3><p>{{planet.description}}</p>
+      {{#if isGM}}<label>Биом экспедиции<select data-planet-zone>{{#each planet.zones}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}</select></label>{{/if}}
+      <div class="genesis-summary-metric"><small>День {{planet.day}} · погода</small><strong>{{planet.weather.name}}</strong><span>{{planet.weather.detail}}</span></div>
+      <p>{{#if planet.sheltered}}Жилой модуль построен: погодные штрафы усталости снижены на 75%, кислород защищён.{{else}}Жилого модуля нет: погодные воздействия применяются полностью.{{/if}}</p>
+      <p class="genesis-muted">Каждые сутки базовое утомление +5, дополнительно влияет погода. Новые задания недоступны при усталости 85 и выше.</p>
+    </div>
+    {{else}}<p>Сначала создайте колонию.</p>{{/if}}
+  </div>
   <div class="genesis-content genesis-crew-page" data-genesis-page="crew" hidden>
     {{#if crew.available}}
       <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / CREW & LOGISTICS</span>
@@ -310,12 +336,7 @@
       <div class="genesis-panel"><h3>Ресурсы на локальных картах</h3>
         {{#if crew.isGM}}<p class="genesis-muted">Размещайте новые месторождения на локальной квадратной сцене. Ведущий определяет запас ресурса; он ограничен и не восстанавливается автоматически.</p>
         <div class="genesis-crew-toolbar genesis-resource-choices">
-          <button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="wood">+ Древесина</button>
-          <button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="stone">+ Камень</button>
-          <button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="fiber">+ Волокно</button>
-          <button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="ore">+ Руда</button>
-          <button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="clay">+ Глина</button>
-          <button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="scrap">+ Обломки</button>
+          {{#each crew.resourceTypes}}<button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="{{id}}">+ {{name}}</button>{{/each}}
         </div>{{/if}}
         <div class="genesis-crew-list">{{#each crew.nodes}}
           <article class="genesis-crew-deposit"><div><strong>{{name}}</strong><small>{{sceneName}} · Осталось {{remaining}} / {{initial}} · {{#unless health}}Состояние неизвестно{{/unless}}{{health}}</small></div>
@@ -335,6 +356,31 @@
         {{else}}<p class="genesis-muted">Записей пока нет.</p>{{/each}}</div></div>
       <p class="genesis-footnote">Ручная грузовая тележка открывается через технологию «Механические передачи» и производится на верстаке. Транспортные пути пока моделируются по расстоянию и массе; токены не перемещаются автоматически. Добыча и доставка — игровые абстракции, а не физическая симуляция.</p>
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Создайте актора «Колония».</p></div>{{/if}}
+  </div>
+  <div class="genesis-content" data-genesis-page="mission" hidden>
+    {{#if mission.available}}
+      <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / PROJECT RETURN</span>
+        <h2>Космическая программа «Возвращение»</h2><p class="genesis-muted">От исследования к сборке космического корабля и финалу кампании.</p></div>
+        <div class="genesis-industry-counter"><strong>{{mission.stage}} / 4</strong><span>ЭТАПЫ</span></div></div>
+      <div class="genesis-panel"><h3>{{mission.current.title}}</h3><p>{{mission.current.description}}</p>
+        <progress max="100" value="{{mission.progress}}" style="width:100%"></progress>
+        <div class="genesis-crew-list">{{#each mission.steps}}
+          <article class="genesis-crew-job {{#if active}}is-ready{{/if}}"><strong>{{index}} · {{title}}</strong>
+            <span class="genesis-crew-time">{{#if done}}ГОТОВО{{else}}{{#if active}}ТЕКУЩИЙ ЭТАП{{else}}ВПЕРЕДИ{{/if}}{{/if}}</span></article>{{/each}}</div>
+      </div>
+      {{#if mission.completed}}<div class="genesis-panel"><h2>Экспедиция завершена!</h2>
+        <p>Игроки создали корабль и открыли дорогу к следующему этапу своей истории. Результаты исследований, база и персонажи остаются в мире.</p></div>
+      {{else}}<div class="genesis-panel"><h3>Требования текущего этапа</h3>
+        <div class="genesis-crew-list">{{#each mission.requirements}}
+          <article class="genesis-crew-job"><strong>{{#if ok}}✓{{else}}○{{/if}} {{name}}</strong>
+            {{#if required}}<span>{{available}} / {{required}}</span>{{/if}}</article>{{/each}}</div>
+        <button type="button" class="genesis-primary" data-genesis-action="mission" {{#unless mission.ready}}disabled{{/unless}} {{#unless mission.canAct}}disabled{{/unless}} {{#unless isGM}}{{#if mission.finalStage}}disabled{{/if}}{{/unless}}>{{mission.nextLabel}}</button>
+        {{#unless mission.ready}}<p class="genesis-muted">Не выполнены необходимые условия — завершите исследования, строительство или производство.</p>{{/unless}}
+        <p class="genesis-footnote">Последний этап запуска подтверждает ведущий. Компоненты забираются с общего склада один раз, с безопасным возобновлением после сбоя.</p>
+      </div>{{/if}}
+      <div class="genesis-panel"><h3>Журнал космической программы</h3>
+        <div class="genesis-log">{{#each mission.log}}<article><span>День {{day}}</span><strong>Завершён этап {{stage}}</strong><small>{{by}}</small></article>{{else}}<p class="genesis-muted">Этапы пока не завершались.</p>{{/each}}</div></div>
+    {{else}}<p>Сначала создайте колонию.</p>{{/if}}
   </div>
   <div class="genesis-content" data-genesis-page="history" hidden>
     <h2>Логистика экспедиции</h2><p class="genesis-muted">Последние 25 подтверждённых перемещений · доступно игрокам и ведущему</p>

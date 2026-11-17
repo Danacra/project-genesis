@@ -5,7 +5,7 @@ import { validateCatalog, techStatus, planInvestment, planMaterialUse, completio
 function state(extra={}) {return {points:50,tier:0,unlocked:[],facilities:[],projects:[],dailyWork:[],discoveries:[],...extra};}
 function item(id,code,quantity,type='material') {return {id,name:code,type,system:{resourceCode:code,quantity}};}
 test('technology catalog is valid and contains multiple parallel branches',()=>{
- const catalog=validateCatalog();assert.equal(catalog.technologies,25);assert.equal(catalog.recipes,26);
+ const catalog=validateCatalog();assert.equal(catalog.technologies,25);assert.equal(catalog.recipes,27);
  assert.ok(new Set(TECHNOLOGIES.map(t=>t.branch)).size>=6);
 });
 test('initial technology is accessible and no cost materials',()=>{

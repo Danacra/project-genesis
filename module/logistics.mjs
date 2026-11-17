@@ -7,12 +7,15 @@ const seenThisSession = new Set();
 const awaiting = new Map();
 const AWAIT_TIMEOUT_MS = 60_000;
 const MAX_STACK = 999_999;
-export function withWorldLock(fn,{allowDayRecovery=false}={}) {
+export function withWorldLock(fn,{allowDayRecovery=false,allowMissionRecovery=false}={}) {
   const guarded=()=>{
     const pending=game.settings?.get?.(SYSTEM,'dayOperation');
     if(!allowDayRecovery && pending?.version===1 &&
         game.settings.get(SYSTEM,'worldDay')===pending.day)
       throw new Error('Переход суток прерван. Сначала повторите «+1 сутки» для безопасного завершения.');
+    const missionPending=game.settings?.get?.(SYSTEM,'missionOperation');
+    if(!allowMissionRecovery && missionPending?.version===1)
+      throw new Error('Сборка корабля не завершена. Перезапустите Foundry для восстановления операции.');
     return fn();
   };
   const next = sequence.then(guarded, guarded);
@@ -191,7 +194,8 @@ async function replayDayOperation(plan){
     const name=game.actors.get(row.actorId)?.name||row.actorId;
     return `${name}: ${row.fed?'еда ✓':'нет еды'}; ${row.hydrated?'вода ✓':'нет воды'}`;
   });
-  try{await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · День ${plan.nextDay}</strong><pre>${foundry.utils.escapeHTML(messages.join('\n'))}</pre></div>`});}
+  const weatherNote=plan.weather?`Погода: ${plan.weather.name}.`:' ';
+  try{await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · День ${plan.nextDay}</strong><p>${foundry.utils.escapeHTML(weatherNote)}</p><pre>${foundry.utils.escapeHTML(messages.join('\n'))}</pre></div>`});}
   catch(error){console.warn('PROJECT GENESIS: day notification failed',error);}
   notification(`Наступил день ${plan.nextDay}.`);
   return {day:plan.nextDay,recovered:false};

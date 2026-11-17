@@ -1,3 +1,14 @@
+# PROJECT GENESIS 1.0.0 — Feature-complete candidate
+
+- 0.9.0: five deterministic planetary climates, daily weather, protected shelter penalties, planet tab.
+- 0.9.5: authenticated, once-per-day survivor rest; recovery of fatigue, shelter bonus, job blocking.
+- 1.0.0: eleven extractable resource nodes, glassmaking recipe, complete resource chain to endgame.
+- 1.0.0: four-stage spaceship project, mapped ship marker, permissions for GM-only launch and persisted, replayable assembly inventory targets.
+- Added acceptance guides and regression tests; preserved all pre-1.0 actor types and data.
+- Not yet signed off for runtime/multiplayer acceptance in live Foundry v13.
+
+---
+
 ## v0.8.5 — безопасные игровые сутки и исправления аудита
 
 - Атомарно планируемый, сохраняемый в world settings переход суток: абсолютные итоги ресурсов, состояния выживших, производства и заданий экипажа; устойчивость к сбою, автоматическое восстановление при старте GM, блокировка команд во время незавершённой операции.

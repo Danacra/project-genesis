@@ -2,6 +2,7 @@
 import {qty,dayVitals,LIMITS} from './rules.mjs';
 import {tickQueue} from './industry-rules.mjs';
 import {crewJob} from './crew-rules.mjs';
+import {weatherForDay,weatherVitals} from './planet.mjs';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 
@@ -19,6 +20,8 @@ export function planDayOperation(survivors,colony,day){
     }
     inventory.set(actor.id,rows);
   }
+  const weather=colony?weatherForDay(day+1,colony.system.environment?.zone,colony.system.environment?.seed):null;
+  const sheltered=Boolean(colony?.system.industry?.buildings?.some(b=>b.id==='shelter'&&b.count>0));
   const survival=[];
   for(const actor of survivors){
     const supplied={};
@@ -36,7 +39,8 @@ export function planDayOperation(survivors,colony,day){
         if(!left)break;
       }
     }
-    survival.push({actorId:actor.id,values:copy(dayVitals(actor.system.survival,supplied.food,supplied.water))});
+    const baseVitals=dayVitals(actor.system.survival,supplied.food,supplied.water);
+    survival.push({actorId:actor.id,values:copy(weather?weatherVitals(baseVitals,weather,sheltered):baseVitals)});
     survival.at(-1).fed=supplied.food;
     survival.at(-1).hydrated=supplied.water;
   }
@@ -44,7 +48,7 @@ export function planDayOperation(survivors,colony,day){
     updates:rows.filter(row=>row.remaining!==row.original).map(row=>({id:row.id,quantity:row.remaining}))
   })).filter(row=>row.updates.length);
   return {
-    version:1,day,nextDay:day+1,colonyId:colony?.id||'',items,survival,
+    version:1,day,nextDay:day+1,colonyId:colony?.id||'',items,survival,weather,
     industry:colony?copy(tickQueue(colony.system.industry)):null,
     crewJobs:colony?copy((colony.system.crew?.jobs||[]).map(row=>crewJob(row,day))):null
   };

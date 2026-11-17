@@ -8,6 +8,7 @@ function livingSchema() {
     abilities: new SchemaField({strength:int(2,1,10),agility:int(2,1,10),endurance:int(2,1,10),intellect:int(2,1,10),perception:int(2,1,10),will:int(2,1,10)}),
     skills: new SchemaField({survival:int(0,0,6),science:int(0,0,6),engineering:int(0,0,6),crafting:int(0,0,6),medicine:int(0,0,6),exploration:int(0,0,6)}),
     survival: new SchemaField({health:int(100),hunger:int(0),thirst:int(0),fatigue:int(0),oxygen:int(100)}),
+    rest:new SchemaField({lastDay:int(0,0,9999999)}),
     biography: text(''), specialization: text(''), notes: text('')
   };
 }
@@ -83,6 +84,8 @@ export class ColonyData extends TypeDataModel {
       history:new ArrayField(new SchemaField({day:int(0,0,9999999),kind:text(''),name:text(''),by:text('')}),{initial:()=>[]}),
       processed:new ArrayField(text(''),{initial:()=>[]})
     }),
+    environment:new SchemaField({zone:text('temperate'),seed:int(71,1,9999999)}),
+    mission:new SchemaField({stage:int(0,0,4),shipTileId:text(''),events:new ArrayField(new SchemaField({stage:int(0,0,4),day:int(0,0,9999999),by:text('')}),{initial:()=>[]})}),
     notes:text(''), biome:text('Неизвестный'), name:text('База')
   };}
 }

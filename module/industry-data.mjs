@@ -18,6 +18,7 @@ export const RECIPES = Object.freeze([
   recipe('mechanism',{scrap:3},{unitMass:3,unitVolume:4},'bench',1,'Механический узел для последующей сборки.'),
   recipe('handcart',{wood:3,scrap:2},{code:'handcart',type:'tool',unitMass:8,unitVolume:20},'bench',2,'Увеличивает предел переносимого груза и ускоряет наземные доставки.'),
   recipe('alloy-parts',{ore:4,scrap:1},{code:'alloy',type:'material',quantity:2,unitMass:2,unitVolume:1},'furnace',2,'Игра использует условные материалы без технологий реальной плавки.'),
+  recipe('glass-panels',{clay:3,stone:2},{code:'glass',type:'material',quantity:2,unitMass:1,unitVolume:.8},'furnace',2,'Игровая абстракция производства стеклокерамики.'),
   recipe('lab-instrument',{glass:2,alloy:1},{type:'tool',unitMass:2,unitVolume:2},'bioLab',2),
   recipe('basic-generator',{copper:3,alloy:2},{unitMass:10,unitVolume:12},'powerLab',3),
   recipe('optical-device',{glass:2,crystal:1},{type:'tool',unitMass:1,unitVolume:2},'fieldLab',2),
@@ -49,7 +50,7 @@ export const BUILDINGS = Object.freeze([
   build('garden','Тепличный модуль','agriculture',{wood:3,organic:3,fiber:3},3,null,{harvest:{code:'food',name:'Пищевой паёк',type:'consumable',quantity:3,unitMass:.4,unitVolume:.5},description:'Даёт 3 абстрактных пищевых пайка раз в игровые сутки.'}),
   build('water-recycler','Станция воды','fluid-systems',{alloy:2,glass:2,scrap:2},3,null,{harvest:{code:'water',name:'Запас воды',type:'consumable',quantity:5,unitMass:.5,unitVolume:.5},description:'Даёт 5 игровых единиц воды раз в сутки.'}),
   build('shelter','Жилой модуль','shelter',{wood:4,fiber:4,stone:2},2,null,{description:'Отмечает развитие жилой инфраструктуры.'}),
-  build('assembly-dock','Сборочный док','orbital-systems',{hull_sections:2,precision_parts:2,alloy:4},6,null,{description:'Поздняя стадия колонии. Космические полёты пока остаются сюжетной целью.'})
+  build('assembly-dock','Сборочный док','orbital-systems',{hull_sections:2,precision_parts:2,alloy:4},6,null,{description:'Основа четырёхэтапной программы сборки корабля экспедиции.'})
 ]);
 export const BUILDING_BY_ID=Object.freeze(Object.fromEntries(BUILDINGS.map(x=>[x.id,x])));
 export function resourceName(code){return RESOURCE_LABELS[code] || RECIPES.find(r=>r.output.code===code)?.name || code;}

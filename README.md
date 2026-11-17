@@ -1,3 +1,15 @@
+# PROJECT GENESIS 1.0.0
+
+Standalone space-survival RPG system for **Foundry VTT v13**. Survive on an uninhabited alien planet, rebuild technology, manage crew logistics, research, facilities and utility grids, and complete a four-stage spaceship finale.
+
+This is a **feature-complete build pending live Foundry acceptance**, not a claim that runtime bugs have been eliminated. Preserve your world: back up `Data/worlds` before updating. Existing actor and scene data are retained.
+
+Russian install, roadmap and QA guides: [`README_RU.md`](README_RU.md), [`ROADMAP_1.0_RU.md`](ROADMAP_1.0_RU.md), [`TESTING_1.0_RU.md`](TESTING_1.0_RU.md).
+
+Run offline tests with Node.js 22+: `node --test tests/*.test.mjs`.
+
+---
+
 # PROJECT GENESIS
 
 Самостоятельная RPG-система для **Foundry VTT v13**, посвящённая научно-фантастическому выживанию и развитию колонии на необитаемой планете.

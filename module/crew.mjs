@@ -292,6 +292,7 @@ export function crewContext(actor,user){
     destination:j.targetKind==='actor'?'Инвентарь':sites.find(p=>p.id===j.targetId)?.name||'Объект удалён',
     kind:({harvest:'Добыча',delivery:'Доставка',pickup:'Получение'})[j.kind]||'Перемещение'}));
   return {available:true,colonyId:colony.id,isGM:!!user?.isGM,canWork:survivors.length>0,
+    resourceTypes:Object.entries(RESOURCE_NODES).map(([id,r])=>({id,name:r.name})),
     survivors:survivors.map(a=>({id:a.id,name:a.name,busy:arr(state.jobs).some(j=>j.actorId===a.id)})),
     nodes:arr(state.nodes).map(n=>({...n,sceneName:game.scenes.get(n.sceneId)?.name||'Сцена удалена',
       health:nodeHealth(n,game.scenes.get(n.sceneId)),canRemove:!!user?.isGM&&n.remaining===0})),

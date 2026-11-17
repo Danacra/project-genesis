@@ -28,7 +28,7 @@ export const TECHNOLOGIES = Object.freeze([
   make('geology','Разведка полезных пород','materials',1,8,['stone-tools'],[],{ore:3,sample:2},'Классификация пород и оценка месторождений.',['geology-kit']),
   make('medicine','Полевое здравоохранение','bio',1,9,['water-analysis','shelter'],['fieldLab'],{fiber:2,organic:1},'Учёт состояния экспедиции и биологической среды.',['med-module']),
   make('mechanics','Механические передачи','energy',1,9,['basic-workshop'],['bench'],{scrap:3},'Моделирование движения и полезной работы.',['mechanism','handcart']),
-  make('material-science','Исследование сплавов','materials',2,12,['geology','basic-workshop'],['furnace'],{ore:4,scrap:2},'Сравнение свойств промышленных материалов.',['alloy-parts']),
+  make('material-science','Исследование сплавов','materials',2,12,['geology','basic-workshop'],['furnace'],{ore:4,scrap:2},'Сравнение свойств промышленных материалов.',['alloy-parts','glass-panels']),
   make('laboratories','Лабораторные стандарты','bio',2,12,['medicine','agriculture'],['bioLab'],{glass:2,alloy:1},'Контроль воспроизводимости исследований.',['lab-instrument']),
   make('electromagnetism','Основы электричества','energy',2,13,['mechanics','material-science'],['powerLab'],{copper:3,alloy:2},'Теория и моделирование электросистем.',['basic-generator']),
   make('optics','Оптика и измерения','computing',2,11,['basic-workshop','water-analysis'],['fieldLab'],{glass:3,crystal:1},'Повышение точности наблюдений и измерений.',['optical-device']),
@@ -42,7 +42,7 @@ export const TECHNOLOGIES = Object.freeze([
   make('navigation','Навигационные вычисления','computing',4,23,['telemetry','optics'],['electronicsLab'],{circuit:4,crystal:2},'Математические модели ориентации и маршрутов.',['navigation-core']),
   make('propulsion','Теория космической тяги','space',4,28,['advanced-materials','power-storage','fluid-systems'],['flightLab'],{alloy:6,circuit:3},'Сюжетное проектирование двигателя без технических инструкций.',['propulsion-assembly']),
   make('orbital-systems','Орбитальные системы','space',4,28,['navigation','habitat','propulsion'],['flightLab'],{circuit:5,alloy:5,glass:3},'Сводная архитектура будущего корабля.',['orbital-core']),
-  make('return-project','Проект «Возвращение»','space',4,35,['orbital-systems','advanced-materials'],['flightLab'],{alloy:8,circuit:6,crystal:4},'Финальная научная программа. Сборка корабля остаётся будущей механикой.',['return-blueprint'])
+  make('return-project','Проект «Возвращение»','space',4,35,['orbital-systems','advanced-materials'],['flightLab'],{alloy:8,circuit:6,crystal:4},'Финальная научная программа, открывающая этапы сборки и запуска корабля.',['return-blueprint'])
 ]);
 export const TECHNOLOGY_BY_ID = Object.freeze(Object.fromEntries(TECHNOLOGIES.map(t=>[t.id,t])));
 export const RECIPE_LIBRARY = Object.freeze({
@@ -51,6 +51,7 @@ export const RECIPE_LIBRARY = Object.freeze({
   'workshop-tools':'Оборудование мастерской', 'growth-module':'Исследовательская грядка',
   'geology-kit':'Геологический комплект', 'med-module':'Медицинский модуль',
   'mechanism':'Механический узел', 'handcart':'Ручная грузовая тележка', 'alloy-parts':'Комплект деталей из сплавов',
+  'glass-panels':'Панели из стеклокерамики',
   'lab-instrument':'Лабораторный прибор', 'basic-generator':'Энергетическая установка',
   'optical-device':'Оптический измеритель', 'flow-controller':'Регулятор потока',
   'precision-parts':'Прецизионные детали', 'power-unit':'Накопитель энергии',
