@@ -18,6 +18,7 @@ import {initializeMission,requestMission,missionStage} from './module/mission.mj
 import {startResourcePlacement,stopResourcePlacement} from './module/crew-placement.mjs';
 import {initializeBuildingInteractions,enterRoom,exitRoom,openStationCraft} from './module/building-interactions.mjs';
 import {initializeInteriorLighting,toggleRoomLighting} from './module/interior-lighting.mjs';
+import {upgradeShelterRoofTiles} from './module/building-roof.mjs';
 const ID = 'project-genesis';
 Hooks.once('init',()=>{
   CONFIG.Actor.dataModels.survivor=SurvivorData;
@@ -51,6 +52,7 @@ Hooks.once('ready',()=>{
   initializeMission();
   initializeBuildingInteractions();
   initializeInteriorLighting();
+  if(game.user?.isGM && game.actors?.filter)void upgradeShelterRoofTiles().catch(error=>console.error('PROJECT GENESIS: roof update',error));
   game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement,planetZones:PLANET_ZONES,weatherForDay,requestRest,requestMission,missionStage,enterRoom,exitRoom,openStationCraft,toggleRoomLighting};
   console.info(`PROJECT GENESIS v${game.system?.version || "development"} ready`);
 });

@@ -64,7 +64,9 @@ async function doCommit(request){
   if(seen.has(request.id)||list(infra.processed).includes(request.id))return 'Операция уже выполнена.';
   const links=list(infra.links);
   let response='';
-  if(request.action==='connect'){
+  if(request.action==='connect'||request.action==='gm-connect'){
+    const gmFree=request.action==='gm-connect';
+    if(gmFree&&!user.isGM)throw Error('Бесплатная прокладка инженерных сетей доступна только ведущему.');
     const type=request.type;
     if(!NETWORK_TYPES[type])throw Error('Выберите тип инженерной сети.');
     if(links.length>=NETWORK_LIMITS.maxLinks)throw Error('Достигнут лимит соединений колонии.');
@@ -80,16 +82,17 @@ async function doCommit(request){
       :routeNetwork(scene,colony.system.industry.placements,a.id,b.id);
     if(links.reduce((n,l)=>n+list(l.tileIds).length,0)+route.length>NETWORK_LIMITS.maxTiles)
       throw Error('Достигнут лимит сегментов инженерных сетей.');
-    const materials=networkCost(type,route.length),plan=planTake(colony.items,materials);
-    const before=backupResources(colony,plan.changes),networkId=generateId();
+    const materials=networkCost(type,route.length);
+    const plan=gmFree?null:planTake(colony.items,materials);
+    const before=plan?backupResources(colony,plan.changes):[],networkId=generateId();
     let tileIds=[],debitAttempted=false;
     try{
-      const created=await scene.createEmbeddedDocuments('Tile',asNetworkTiles(type,route,{networkId,colonyId:colony.id,grid}));
+      const created=await scene.createEmbeddedDocuments('Tile',asNetworkTiles(type,route,{networkId,colonyId:colony.id,grid,gmFree}));
       tileIds=created.map(t=>t.id);
       if(tileIds.length!==route.length||tileIds.some(x=>!x))throw Error('Не удалось создать все сегменты сети.');
-      debitAttempted=true;await colony.updateEmbeddedDocuments('Item',plan.changes);
+      if(plan){debitAttempted=true;await colony.updateEmbeddedDocuments('Item',plan.changes);}
       const link={id:networkId,colonyId:colony.id,sceneId:scene.id,type,fromId:a.id,toId:b.id,
-        route,tileIds,createdDay:game.settings.get(SYSTEM,'worldDay'),by:user.name};
+        route,tileIds,createdDay:game.settings.get(SYSTEM,'worldDay'),by:user.name,gmFree};
       await colony.update(updateInfra({links:[...links,link],processed:newProcessed(infra,request.id)}));
     }catch(error){
       let broken=false;
@@ -98,7 +101,7 @@ async function doCommit(request){
       if(broken)throw Error('Ошибка отката инженерной сети: ведущий должен проверить сцену и склад вручную.');
       throw error;
     }
-    response=`Проложено: ${NETWORK_TYPES[type].name}, ${route.length} клеток. Материалы списаны со склада.`;
+    response=`Проложено: ${NETWORK_TYPES[type].name}, ${route.length} клеток. ${gmFree?'Режим GM: материалы не списаны.':'Материалы списаны со склада.'}`;
   }else if(request.action==='disconnect'){
     const link=links.find(l=>l.id===request.linkId);
     if(!link)throw Error('Соединение уже удалено.');
@@ -135,7 +138,7 @@ async function doCommit(request){
     if(list(link.route).length!==list(link.tileIds).length)throw Error('Нарушена структура маршрута. Восстановите данные сети из резервной копии.');
     const grid=sceneGeometry(scene).grid,missing=[];
     for(let i=0;i<link.tileIds.length;i++)if(!scene.tiles.get(link.tileIds[i]))missing.push(i);
-    const fullTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:colony.id,grid});
+    const fullTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:colony.id,grid,gmFree:!!link.gmFree});
     const data=missing.map(i=>fullTiles[i]);
     // A survivor fixing a broken line pays for replacement material. The GM's
     // no-cost restoration remains an administrative repair for accidental deletion.
@@ -179,7 +182,7 @@ export function networkContext(actor,user,networkSnapshot=null){
   });
   const buildingNames=new Map(buildings.map(b=>[b.id,b.name]));
   const links=list(infra.links).map(l=>({
-    ...l,name:NETWORK_TYPES[l.type]?.name||l.type,sceneName:game.scenes.get(l.sceneId)?.name||'Неизвестная сцена',
+    ...l,gmFree:!!l.gmFree,name:NETWORK_TYPES[l.type]?.name||l.type,sceneName:game.scenes.get(l.sceneId)?.name||'Неизвестная сцена',
     from:buildingNames.get(l.fromId)||'Удалённое здание',
     to:buildingNames.get(l.toId)||'Удалённое здание',
     length:l.route.length,health:statuses[l.id],ok:statuses[l.id]==='ok',

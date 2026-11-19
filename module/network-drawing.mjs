@@ -10,7 +10,7 @@ let active=null;
 const isCanvasTarget=t=>t===canvas?.app?.canvas||t===canvas?.app?.view||t?.id==='board';
 export function cancelNetworkDrawing(){active?.cancel();active=null;}
 /** Starts after the user chooses two buildings and a utility type. */
-export function startNetworkDrawing({colonyId,type,fromId,toId}){
+export function startNetworkDrawing({colonyId,type,fromId,toId,gmFree=false}){
   cancelNetworkDrawing();cancelPlacement();
   const colony=game.actors.get(colonyId),placements=colony?.system?.industry?.placements||[];
   const a=placements.find(p=>p.id===fromId),b=placements.find(p=>p.id===toId);
@@ -21,7 +21,7 @@ export function startNetworkDrawing({colonyId,type,fromId,toId}){
   const controller=new AbortController(),options={signal:controller.signal,capture:true};
   const layer=document.createElement('div');layer.className='genesis-network-ghost';document.body.append(layer);
   const banner=document.createElement('div');banner.className='genesis-placement-banner genesis-network-banner';
-  const title=document.createElement('strong');title.textContent=`Ручная сеть: ${type==='power'?'кабель':'водопровод'}`;
+  const title=document.createElement('strong');title.textContent=`${gmFree?'GM · бесплатная ':''}Ручная сеть: ${type==='power'?'кабель':'водопровод'}`;
   const hint=document.createElement('span');hint.textContent='ЛКМ — соседняя клетка · Backspace — назад · Enter — завершить · Esc — отмена';
   const count=document.createElement('span');count.className='genesis-network-counter';
   const done=document.createElement('button');done.type='button';done.textContent='Завершить';done.disabled=true;
@@ -68,10 +68,11 @@ export function startNetworkDrawing({colonyId,type,fromId,toId}){
     submitting=true;render();
     let approved=false;
     try{approved=await foundry.applications.api.DialogV2.confirm({window:{title:'Подтвердить ручной маршрут'},
-      content:`<p>Проложить инженерную сеть длиной ${route.length} клеток? Стоимость будет рассчитана ведущим, а ресурсы списаны со склада колонии.</p>`,
+      content:gmFree?`<p>GM: проложить ${route.length} сегментов БЕЗ затрат материалов? Правила маршрута сохраняются.</p>`:
+        `<p>Проложить инженерную сеть длиной ${route.length} клеток? Стоимость будет рассчитана ведущим, а ресурсы списаны со склада колонии.</p>`,
       yes:{label:'Проложить'},no:{label:'Продолжить редактирование'}});}catch{approved=false;}
     if(stopped)return;
-    if(approved){const submitted=route.map(c=>({...c}));cancel();await requestNetwork({action:'connect',colonyId,type,fromId,toId,route:submitted});}
+    if(approved){const submitted=route.map(c=>({...c}));cancel();await requestNetwork({action:gmFree?'gm-connect':'connect',colonyId,type,fromId,toId,route:submitted});}
     else{submitting=false;render();}
   };
   const undo=()=>{if(submitting)return;route.pop();render();};

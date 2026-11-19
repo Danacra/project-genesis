@@ -1,4 +1,4 @@
-const { NumberField, StringField, SchemaField, ArrayField } = foundry.data.fields;
+const { NumberField, StringField, SchemaField, ArrayField, BooleanField } = foundry.data.fields;
 const int = (value, min=0, max=100) => new NumberField({ required: true, nullable: false, integer: true, min, max, initial: value });
 const dec = (value, min=0) => new NumberField({ required: true, nullable: false, min, initial: value });
 const text = (value='') => new StringField({required: true, nullable: false, initial: value, blank: true});
@@ -38,12 +38,12 @@ export class ColonyData extends TypeDataModel {
     industry:new SchemaField({
       jobs:new ArrayField(makeIndustryJob(),{initial:()=>[]}),
       construction:new ArrayField(makeIndustryJob(),{initial:()=>[]}),
-      buildings:new ArrayField(new SchemaField({id:text(''),count:int(1,0,100),builtDay:int(0,0,9999999),lastClaimDay:int(0,0,9999999)}),{initial:()=>[]}),
+      buildings:new ArrayField(new SchemaField({id:text(''),count:int(1,0,10000),builtDay:int(0,0,9999999),lastClaimDay:int(0,0,9999999)}),{initial:()=>[]}),
       // 0.6 scene links, additive schema for existing 0.5 colonies.
       placements:new ArrayField(new SchemaField({
         id:text(''),colonyId:text(''),buildingId:text(''),sceneId:text(''),tileId:text(''),jobId:text(''),interiorSceneId:text(''),
         x:int(0,0,10000000),y:int(0,0,10000000),width:int(1,1,10000000),height:int(1,1,10000000),
-        status:text('construction'),createdDay:int(0,0,9999999),by:text('')
+        status:text('construction'),gmInstant:new BooleanField({required:true,nullable:false,initial:false}),createdDay:int(0,0,9999999),by:text('')
       }),{initial:()=>[]}),
       history:new ArrayField(new SchemaField({day:int(0,0,9999999),kind:text(''),name:text(''),by:text('')}),{initial:()=>[]}),
       processed:new ArrayField(text(''),{initial:()=>[]})
@@ -53,6 +53,7 @@ export class ColonyData extends TypeDataModel {
       links:new ArrayField(new SchemaField({
         id:text(''),colonyId:text(''),sceneId:text(''),type:text('power'),
         fromId:text(''),toId:text(''),createdDay:int(0,0,9999999),by:text(''),
+        gmFree:new BooleanField({required:true,nullable:false,initial:false}),
         route:new ArrayField(new SchemaField({x:int(0,0,10000000),y:int(0,0,10000000)}),{initial:()=>[]}),
         tileIds:new ArrayField(text(''),{initial:()=>[]})
       }),{initial:()=>[]}),

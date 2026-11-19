@@ -159,7 +159,9 @@ async function askNetwork(sheet,el){
   const colony=colonyFor(sheet.document);
   if(!colony)return ui.notifications.warn('Создайте колонию для управления инженерными сетями.');
   const action=el.dataset.networkAction;
-  if(action==='connect'||action==='draw'){
+  if(['connect','draw','gm-connect','gm-draw'].includes(action)){
+    const gmFree=action==='gm-connect'||action==='gm-draw';
+    if(gmFree&&!game.user.isGM)return ui.notifications.warn('Бесплатные инженерные работы доступны только GM.');
     const context=networkContext(colony,game.user);
     if(context.buildings.length<2)return ui.notifications.warn('Для сети нужны два готовых здания на карте.');
     const entries=context.buildings.filter(b=>b.working||b.status==='Нет питания'||b.status==='Нет водоснабжения'||b.status==='Ручной режим');
@@ -168,8 +170,8 @@ async function askNetwork(sheet,el){
     if(entries.length<2)return ui.notifications.warn('На карте недостаточно исправных готовых зданий.');
     const types=context.types.map(t=>opt(t.id,t.name)).join('');
     let chosen;
-    try{chosen=await Dialog.prompt({window:{title:'Прокладка инженерной сети'},
-      content:`<div class="genesis-dialog"><p>Система сама найдёт маршрут по клеткам вокруг построек. Кабель использует медь, водопровод — сплав. Точная стоимость будет вычислена перед списанием на сервере ведущего.</p>
+    try{chosen=await Dialog.prompt({window:{title:gmFree?'Прокладка инженерной сети (GM, бесплатно)':'Прокладка инженерной сети'},
+      content:`<div class="genesis-dialog"><p>${gmFree?'GM: кабели и трубы бесплатно, без исследований и списания материалов.':'Система сама найдёт маршрут по клеткам вокруг построек. Кабель использует медь, водопровод — сплав. Точная стоимость будет вычислена перед списанием на сервере ведущего.'}</p>
         <label>Тип коммуникации<select name="type">${types}</select></label>
         <label>Здание A<select name="fromId">${choices}</select></label>
         <label>Здание B<select name="toId">${endChoices}</select></label>
@@ -177,8 +179,8 @@ async function askNetwork(sheet,el){
       ok:{label:'Проложить',callback:(_e,button)=>({type:formText(button.form,'type'),
         fromId:formText(button.form,'fromId'),toId:formText(button.form,'toId')})}});}
     catch{return;}
-    if(chosen){if(action==='draw')startNetworkDrawing({...chosen,colonyId:colony.id});
-      else await requestNetwork({...chosen,colonyId:colony.id,action});}
+    if(chosen){if(action==='draw'||action==='gm-draw')startNetworkDrawing({...chosen,colonyId:colony.id,gmFree});
+      else await requestNetwork({...chosen,colonyId:colony.id,action:gmFree?'gm-connect':'connect'});}
     return;
   }
   const linkId=el.dataset.linkId;

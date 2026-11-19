@@ -158,12 +158,13 @@ export function validateNetworkLink(link,scene){
   if(!NETWORK_TYPES[link.type])return 'invalid-type';
   if(!list(link.route).length||link.route.length!==list(link.tileIds).length)return 'missing-tile';
   let g;try{g=cellsInBounds(scene);}catch{return 'bad-scene';}
-  const tiles=scene.tiles,expectedTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:link.colonyId,grid:g.grid});
+  const tiles=scene.tiles,expectedTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:link.colonyId,grid:g.grid,gmFree:!!link.gmFree});
   for(let i=0;i<link.tileIds.length;i++){
     const tile=tiles?.get?.(link.tileIds[i])||[...(tiles||[])].find(t=>t.id===link.tileIds[i]);
     if(!tile)return 'missing-tile';
     const flag=tile.flags?.['project-genesis'];
-    if(flag?.networkId!==link.id||flag?.colonyId!==link.colonyId||flag?.networkType!==link.type)return 'foreign-tile';
+    if(flag?.networkId!==link.id||flag?.colonyId!==link.colonyId||flag?.networkType!==link.type||
+       !!flag?.gmFree!==!!link.gmFree)return 'foreign-tile';
     const expected=expectedTiles[i];
     if(Math.abs(Number(tile.rotation??0)-expected.rotation)>0.01||
        tile.texture?.src!==expected.texture.src||
@@ -175,7 +176,7 @@ export function validateNetworkLink(link,scene){
 /** Tile images are rotated to follow cable/pipe path direction; corners are
  * drawn with a separate elbow texture, and single-cell routes get a junction.
  */
-export function asNetworkTiles(type,route,{networkId,colonyId,grid}){
+export function asNetworkTiles(type,route,{networkId,colonyId,grid,gmFree=false}){
   if(!NETWORK_TYPES[type])throw Error('Неизвестный тип сети.');
   const direction=(a,b)=>({x:Math.sign(b.x-a.x),y:Math.sign(b.y-a.y)});
   const makeTile=(cell,index)=>{
@@ -192,7 +193,7 @@ export function asNetworkTiles(type,route,{networkId,colonyId,grid}){
     }else if(dirs[0]?.x)rotation=90;
     return {x:cell.x,y:cell.y,width:grid,height:grid,rotation,alpha:0.92,hidden:false,locked:true,
       texture:{src:`systems/project-genesis/assets/networks/${type}-${part}.svg`},
-      flags:{'project-genesis':{networkId,colonyId,networkType:type,index}}};
+      flags:{'project-genesis':{networkId,colonyId,networkType:type,index,gmFree:!!gmFree}}};
   };
   return route.map(makeTile);
 }

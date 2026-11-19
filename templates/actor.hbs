@@ -299,12 +299,13 @@
           {{#if canRepair}}<button type="button" class="genesis-map-repair" data-genesis-action="repair-map" data-placement-id="{{id}}">Восстановить тайл (GM)</button>{{/if}}
           {{#if isFinished}}{{#if isRoom}}<button type="button" class="genesis-primary" data-genesis-action="enter-room" data-placement-id="{{id}}">Войти внутрь</button>{{/if}}
             {{#if isStation}}<button type="button" class="genesis-primary" data-genesis-action="station-craft" data-placement-id="{{id}}">Крафт</button>{{/if}}{{/if}}
-          {{#if canDismantle}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="salvage" data-placement-id="{{id}}">Разобрать (50%)</button>
-            <button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="erase" data-placement-id="{{id}}" class="genesis-danger">Удалить (GM)</button>{{/if}}
+          {{#if canDismantle}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="salvage" data-placement-id="{{id}}">Разобрать (50%)</button>{{/if}}
+          {{#if canErase}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="erase" data-placement-id="{{id}}" class="genesis-danger">Удалить (GM)</button>{{/if}}
+          {{#if canCancelSite}}<button type="button" data-genesis-action="industry" data-industry-action="cancel" data-queue="construction" data-job-id="{{jobId}}" class="genesis-danger">Отменить стройплощадку (GM)</button>{{/if}}
           <button type="button" data-genesis-action="map-location" data-scene-id="{{sceneId}}" data-x="{{x}}" data-y="{{y}}">Найти на карте</button></article>
       {{else}}<p class="genesis-muted">Пока ни одно сооружение не размещено на карте.</p>{{/each}}</div>
     </div>
-    <div class="genesis-panel"><h3>Каталог сооружений</h3><p class="genesis-muted">Обычное строительство требует изучения технологии и материалов. GM может мгновенно поставить готовое сооружение для тестирования с помощью отдельной кнопки — без траты материалов.</p>
+    <div class="genesis-panel"><h3>Каталог сооружений</h3><p class="genesis-muted">Обычное строительство ограничено исследованиями, материалами и числом зданий. GM может размещать любое количество готовых сооружений бесплатно: действует только проверка свободного места и допустимого типа карты. Бесплатно размещённые здания не возвращают ресурсы при разборке.</p>
       <div class="genesis-production-grid">{{#each industry.buildings}}
         {{#if hiddenForPlayer}}
         <article class="genesis-product-card genesis-building-card genesis-discovery-secret" aria-label="Неизвестное сооружение"><div class="genesis-secret-icon" aria-hidden="true">?</div><h3>???</h3><p>Сооружение пока не открыто</p></article>
@@ -312,7 +313,7 @@
         <article class="genesis-product-card genesis-building-card {{#unless unlocked}}is-locked{{/unless}}">
           <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ДОСТУПНО{{else}}◇ НУЖНО ИССЛЕДОВАНИЕ{{/if}}</span><span class="genesis-product-duration">{{days}} сут.</span></div>
           <h3>{{name}}</h3><p class="genesis-product-desc">{{description}}</p>
-          <div class="genesis-production-meta"><span>ПОСТРОЕНО</span><strong>{{built}} / {{max}}{{#if underConstruction}} · строится {{underConstruction}}{{/if}}</strong></div>
+          <div class="genesis-production-meta"><span>ПОСТРОЕНО</span><strong>{{built}} / {{max}} (обычный лимит){{#if underConstruction}} · строится {{underConstruction}}{{/if}}</strong></div>
           <div class="genesis-material-grid">{{#each materials}}<div class="genesis-material-chip {{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></div>{{/each}}</div>
           {{#if indoorRestricted}}<p class="genesis-tech-alert">Этот объект строится только снаружи помещения.</p>{{/if}}
           {{#if ../industry.canAct}}<button type="button" class="genesis-primary genesis-product-button" data-genesis-action="industry" data-industry-action="start-building" data-subject="{{id}}" {{#unless canQueue}}disabled{{/unless}}>Разместить на карте</button>{{/if}}
@@ -334,6 +335,10 @@
         <div class="genesis-network-actions">
           <button type="button" class="genesis-primary" data-genesis-action="network" data-network-action="connect">Автомаршрут</button>
           <button type="button" class="genesis-primary" data-genesis-action="network" data-network-action="draw">✎ Ручная прокладка</button>
+          {{#if networks.isGM}}
+            <button type="button" class="genesis-gm-free" data-genesis-action="network" data-network-action="gm-connect">⚡/◉ GM · Автомаршрут бесплатно</button>
+            <button type="button" class="genesis-gm-free" data-genesis-action="network" data-network-action="gm-draw">✎ GM · Проложить вручную бесплатно</button>
+          {{/if}}
         </div>
       {{/if}}
     </div>
@@ -359,7 +364,7 @@
     </div>
     <div class="genesis-panel"><h3>Кабели и трубопроводы</h3>
       <div class="genesis-network-links">{{#each networks.links}}
-        <article class="genesis-network-link"><div><strong>{{name}} · {{from}} → {{to}}</strong>
+        <article class="genesis-network-link"><div><strong>{{name}} · {{from}} → {{to}} {{#if gmFree}}· GM (бесплатно){{/if}}</strong>
           <small>{{sceneName}} · {{length}} клеток · {{#if ok}}Исправно{{else}}⚠ {{health}}{{/if}}</small></div>
           {{#if canMaintain}}<button type="button" data-genesis-action="network" data-network-action="maintain" data-link-id="{{id}}">Ремонт · {{missingSegments}} сегм.</button>{{/if}}
           {{#if canRepair}}<button type="button" data-genesis-action="network" data-network-action="repair" data-link-id="{{id}}">Восстановить бесплатно (GM)</button>{{/if}}

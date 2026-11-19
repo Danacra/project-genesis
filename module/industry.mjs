@@ -4,7 +4,7 @@ import { recipeState, buildingState, buildingCount, planTake, outputItem, deposi
 import { withWorldLock } from './logistics.mjs';
 import { colonyFor } from './research.mjs';
 import { stockByCode } from './research-rules.mjs';
-import { assertPlacement, asTileData, tileAsset, placementHealth, assertHealthyPlacement } from './map-rules.mjs';
+import { assertPlacement, asTileData, tileAsset, placementHealth, assertHealthyPlacement, validateTileLink } from './map-rules.mjs';
 import { stationOperational,placementOperational,getNetworkSimulation } from './networks.mjs';
 import {isInteriorBuilding,isCraftStation,salvageFor,structureBlockers,assertCanPlaceInside,assertInteriorOwnership} from './structure-rules.mjs';
 import {capacity,summarizeInventory} from './rules.mjs';
@@ -190,9 +190,9 @@ async function commit(request){
     if(!user.isGM)throw Error('Размещать готовые здания без ресурсов может только ведущий.');
     const b=BUILDING_BY_ID[request.subject];
     if(!b)throw Error('Неизвестное сооружение.');
+    // GM creative placement is deliberately outside the normal construction cap.
+    // The cap remains enforced for resource-funded player construction.
     const built=buildingCount(industry,b.id);
-    const queued=array(industry.construction).filter(j=>j.subject===b.id).length;
-    if(built+queued>=b.max)throw Error('Достигнут лимит построек этого типа, включая незавершённые.');
     const scene=game.scenes.get(request.sceneId);
     if(!scene)throw Error('Откройте сцену, на которой хотите разместить здание.');
     assertCanPlaceInside(b.id,scene);
@@ -201,7 +201,7 @@ async function commit(request){
     const placementId=uid(),jobId=uid();
     const placement={id:placementId,colonyId:colony.id,buildingId:b.id,sceneId:scene.id,
       tileId:'',jobId,x:rect.x,y:rect.y,width:rect.width,height:rect.height,
-      status:'finished',createdDay:day(),by:user.name};
+      status:'finished',gmInstant:true,createdDay:day(),by:user.name};
     const previous=array(industry.buildings).find(x=>x.id===b.id);
     const buildings=[...array(industry.buildings).filter(x=>x.id!==b.id),
       {id:b.id,count:built+1,builtDay:day(),lastClaimDay:previous?.lastClaimDay||0}];
@@ -267,14 +267,23 @@ async function commit(request){
       missionStage:colony.system.mission?.stage});
     if(reasons.length)throw Error(reasons.join(' '));
     const scene=game.scenes.get(p.sceneId),tile=scene?.tiles?.get?.(p.tileId);
-    assertHealthyPlacement(p,scene,tile);
+    // Administrative removal must work even after a GM manually removed the Tile
+    // or the Scene. Never delete a foreign Tile from an unrelated placement.
+    const health=placementHealth(p,scene,tile);
+    const ownedTile=!!(scene&&tile&&health!=='foreign-tile'&&validateTileLink(p,tile));
+    if(request.mode==='salvage'&&health!=='ok')
+      throw Error('Для возврата материалов сначала восстановите корректную связь с тайлом. Административное удаление (GM) доступно без тайла.');
     const built=buildingCount(industry,b.id);
     if(built<1)throw Error('Счётчик построек повреждён. Нужна проверка ведущего.');
     const interior=p.interiorSceneId?game.scenes.get(p.interiorSceneId):null;
     if(interior){
-      const used=['tiles','tokens','walls','drawings','lights','sounds','notes','templates','regions'].some(k=>[...(interior[k]||[])].length>0);
-      if(used)throw Error('Внутренняя сцена содержит игровые объекты. Сначала сохраните или очистите её: автоматическое удаление небезопасно.');
+      const used=['tiles','tokens','walls','drawings','sounds','notes','templates','regions'].some(k=>[...(interior[k]||[])].length>0) ||
+        [...(interior.lights||[])].some(light=>
+          !(light.flags?.[SYSTEM]?.managedInteriorLight && light.flags?.[SYSTEM]?.placementId===p.id));
+      if(used)throw Error('Внутренняя сцена содержит токены или созданные вручную объекты. Переместите персонажей наружу и уберите свои объекты, затем повторите удаление.');
     }
+    if(request.mode==='salvage'&&p.gmInstant)
+      throw Error('Это здание создано ведущим бесплатно. Возврат стройматериалов недоступен; используйте «Удалить (GM)».');
     const materials=request.mode==='salvage'?salvageFor(b.id):{};
     const reserve=Object.entries(materials).map(([code,count])=>{
       const spec=RESOURCE_NODES[code]||RECIPES.find(r=>r.output.code===code)?.output||{};
@@ -294,8 +303,8 @@ async function commit(request){
     }
     const facilities=b.facility&&built===1?
       array(colony.system.science?.facilities).filter(id=>id!==b.facility):array(colony.system.science?.facilities);
-    const tileBackup=tile.toObject();
-    await scene.deleteEmbeddedDocuments('Tile',[tile.id]);
+    const tileBackup=ownedTile?tile.toObject():null;
+    if(ownedTile)await scene.deleteEmbeddedDocuments('Tile',[tile.id]);
     try{
       await refundAndCommit(colony,reserve,{
         buildings:newBuildings,placements:array(industry.placements).filter(x=>x.id!==p.id),
@@ -307,17 +316,19 @@ async function commit(request){
         'system.infrastructure.priorities':array(colony.system.infrastructure?.priorities).filter(x=>x.id!==p.id)
       });
     }catch(error){
-      try{
-        const restored=await scene.createEmbeddedDocuments('Tile',[tileBackup],{keepId:true});
-        if(restored[0]?.id!==tile.id)throw Error('ID тайла изменился.');
-      }catch(recovery){console.error('GENESIS: dismantling rollback failed',recovery);
-        throw Error('Сохранение разборки прервано; не удалось восстановить тайл. Проверьте карту и склад вручную.');}
+      if(ownedTile){
+        try{
+          const restored=await scene.createEmbeddedDocuments('Tile',[tileBackup],{keepId:true});
+          if(restored[0]?.id!==tile.id)throw Error('ID тайла изменился.');
+        }catch(recovery){console.error('GENESIS: dismantling rollback failed',recovery);
+          throw Error('Сохранение разборки прервано; не удалось восстановить тайл. Проверьте карту и склад вручную.');}
+      }
       throw error;
     }
     if(interior){try{await interior.delete();}catch(error){
       console.warn('GENESIS: empty interior scene could not be deleted',error);
       ui.notifications.warn('Здание разобрано, но пустую внутреннюю сцену пришлось оставить. Удалите её вручную после проверки.');}}
-    result=`${b.name}: ${request.mode==='salvage'?'разобрано, пригодные материалы возвращены на общий склад':'удалено без возврата ресурсов'}.`;
+    result=`${b.name}: ${request.mode==='salvage'?'разобрано, пригодные материалы возвращены на общий склад':'удалено без возврата ресурсов'}.${!ownedTile&&tile?' Тайл с чужими флагами не тронут.':!ownedTile?' Отсутствующий тайл не помешал удалению.':''}`;
   }else if(action==='repair-map'){
     if(!user.isGM)throw Error('Восстанавливать тайлы может только ведущий.');
     const placement=array(industry.placements).find(p=>p.id===request.placementId);
@@ -415,10 +426,13 @@ async function commit(request){
     if(!user.isGM&&job.userId!==user.id)throw Error('Отменить чужой заказ может только GM.');
     const placement=field==='construction'?array(industry.placements).find(p=>p.jobId===job.id):null;
     const scene=placement?game.scenes.get(placement.sceneId):null;
-    const tile=placement?scene?.tiles.get(placement.tileId):null;
-    if(placement)assertHealthyPlacement(placement,scene,tile);
-    const tileBackup=tile?.toObject?.();
-    if(tile)await scene.deleteEmbeddedDocuments('Tile',[tile.id]);
+    const tile=placement?scene?.tiles?.get?.(placement.tileId):null;
+    if(placement&&!user.isGM)assertHealthyPlacement(placement,scene,tile);
+    // GM may recover a construction order even if the Scene/Tile was manually removed.
+    // Never delete a foreign Tile just because a damaged record points to its ID.
+    const trustedTile=!!(placement&&scene&&tile&&validateTileLink(placement,tile));
+    const tileBackup=trustedTile?tile.toObject():null;
+    if(trustedTile)await scene.deleteEmbeddedDocuments('Tile',[tile.id]);
     try{
       const updated={
         [field]:array(industry[field]).filter(x=>x.id!==job.id),
@@ -494,7 +508,7 @@ export function industryContext(actor,user,precomputedSimulation=null){
     const allowedHere=!indoor||['bench','fieldLab','furnace','bioLab','electronicsLab'].includes(b.id);
     return {...b,...status,canQueue:allowedHere&&canAct&&status.canStart,
       indoorRestricted:!allowedHere,hiddenForPlayer:!user.isGM&&!status.unlocked,
-      canGMInstant:user.isGM&&allowedHere&&status.built+status.underConstruction<b.max,
+      canGMInstant:user.isGM&&allowedHere,
       legacyUnmapped:Math.max(0,status.built-mappedFinished),
       canPlaceLegacy:user.isGM&&status.built>mappedFinished,
       techName:status.unlocked?'Изучено':'Нужна технология',
@@ -518,7 +532,10 @@ export function industryContext(actor,user,precomputedSimulation=null){
       const health=placementHealth(p,scene,tile);
       return {...p,name:BUILDING_BY_ID[p.buildingId]?.name||p.buildingId,
         sceneName:scene?.name||'Удалённая сцена',isFinished:p.status==='finished',
-        canDismantle:user.isGM&&p.status==='finished'&&health==='ok',
+        canDismantle:user.isGM&&p.status==='finished'&&health==='ok'&&!p.gmInstant,
+        canErase:user.isGM&&p.status==='finished',
+        gmInstant:!!p.gmInstant,
+        canCancelSite:user.isGM&&p.status==='construction'&&constructionByJob.has(p.jobId),
         isRoom:isInteriorBuilding(p.buildingId),isStation:isCraftStation(p.buildingId),
         mapOk:health==='ok',canRepair:user.isGM&&health==='missing-tile',
         mapProblem:({
