@@ -298,3 +298,53 @@
   background:#35434b!important;color:#effbff!important;border:1px solid #83b7c6!important;
   padding:8px 13px!important;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
 @media(max-width:700px){.genesis-room-light-switch{left:12px;top:215px}}
+
+
+/* v1.3.2 — legible, consistent Cyrillic typography and responsive lists. */
+.genesis, .genesis .genesis-layout, .genesis .genesis-content,
+.genesis .genesis-research-page, .genesis button, .genesis input, .genesis select {
+  font-family: system-ui, "Segoe UI", Arial, sans-serif !important;
+  letter-spacing:normal;
+}
+.genesis .genesis-heading h1, .genesis .genesis-industry-head h2,
+.genesis .genesis-subtree-header h3,.genesis .genesis-subtree-inspector h3,
+.genesis .genesis-subtech-card strong,.genesis .genesis-tech-card strong,
+.genesis .genesis-product-card h3,.genesis .genesis-content h2,
+.genesis .genesis-content h3 {font-family:system-ui,"Segoe UI",Arial,sans-serif!important;letter-spacing:normal;overflow-wrap:anywhere;line-height:1.35;}
+.genesis .genesis-content{font-size:14px;line-height:1.55;min-width:0;}
+.genesis .genesis-muted,.genesis .genesis-product-desc{font-size:13px;line-height:1.5;}
+.genesis .genesis-product-state,.genesis .genesis-product-duration,.genesis .genesis-material-chip,
+.genesis .genesis-production-meta,.genesis .genesis-subtech-card small{font-size:12px;line-height:1.45;}
+.genesis .genesis-tech-card strong,.genesis .genesis-subtech-card strong{font-size:14px;}
+.genesis .genesis-subtech-card em{font-size:12px;line-height:1.45;}
+.genesis .genesis-tech-card{min-height:115px;}
+.genesis .genesis-product-card{display:flex;flex-direction:column;gap:10px;min-height:260px;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;}
+.genesis .genesis-product-card h3{font-size:16px;margin:0;min-height:2.7em;}
+.genesis .genesis-product-card .genesis-product-desc{min-height:3.1em;margin:0;}
+.genesis .genesis-product-card .genesis-material-grid{margin-top:auto;margin-bottom:0;}
+.genesis .genesis-product-card>button{display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.35;min-height:42px;width:100%;box-sizing:border-box;margin-top:3px;}
+.genesis .genesis-production-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));align-items:stretch;gap:14px;}
+.genesis .genesis-production-grid>*{min-width:0;}
+.genesis .genesis-product-top{min-width:0;flex-wrap:wrap;gap:6px;}
+.genesis .genesis-subtree-phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));align-items:stretch;overflow-x:visible;gap:14px;}
+.genesis .genesis-subtree-phase{min-width:0;}
+.genesis .genesis-subtech-card{min-height:125px;box-sizing:border-box;}
+.genesis .genesis-subtree-phase header span{font-size:13px;}
+.genesis .genesis-subtree-phase header small{font-size:12px;line-height:1.4;}
+.genesis .genesis-survey-inspector button{width:100%;min-height:42px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;padding:10px 12px;}
+.genesis .genesis-subtree-header{align-items:center;}
+.genesis .genesis-recipe-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));align-items:stretch;gap:12px;}
+.genesis .genesis-recipe{min-height:110px;min-width:0;box-sizing:border-box;}
+.genesis .genesis-recipe strong{font-size:14px;line-height:1.3;}
+.genesis .genesis-recipe small{font-size:12px;line-height:1.4;}
+.genesis .genesis-discovery-secret{min-height:170px;align-items:center;justify-content:center;text-align:center;background:#1b2d34;border:1px dashed #4d6469;gap:9px;}
+.genesis .genesis-discovery-secret h3{min-height:0;color:#bacccd;font-size:20px;}
+.genesis .genesis-discovery-secret p{margin:0;color:#a2b8ba;font-size:13px;}
+.genesis .genesis-secret-icon{font-size:30px;font-weight:800;display:grid;place-items:center;width:52px;height:52px;border:1px solid #526c73;border-radius:50%;color:#d0dbd5;}
+.genesis .genesis-gm-build{background:#45556b!important;border-color:#8dabd0!important;color:#f5f8ff!important;}
+.genesis .genesis-tech-layout,.genesis .genesis-subtree-layout{min-width:0;}
+@media(max-width:760px){
+ .genesis .genesis-tech-layout,.genesis .genesis-subtree-layout{grid-template-columns:1fr;}
+ .genesis .genesis-production-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));}
+ .genesis .genesis-content{padding:14px;}
+}

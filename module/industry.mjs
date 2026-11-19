@@ -186,6 +186,43 @@ async function commit(request){
       }
       result=`Стройплощадка размещена на карте «${scene.name}»: ${b.name}, ${b.days} сут.`;
     }
+  }else if(action==='gm-instant-build'){
+    if(!user.isGM)throw Error('Размещать готовые здания без ресурсов может только ведущий.');
+    const b=BUILDING_BY_ID[request.subject];
+    if(!b)throw Error('Неизвестное сооружение.');
+    const built=buildingCount(industry,b.id);
+    const queued=array(industry.construction).filter(j=>j.subject===b.id).length;
+    if(built+queued>=b.max)throw Error('Достигнут лимит построек этого типа, включая незавершённые.');
+    const scene=game.scenes.get(request.sceneId);
+    if(!scene)throw Error('Откройте сцену, на которой хотите разместить здание.');
+    assertCanPlaceInside(b.id,scene);
+    assertInteriorOwnership(colony,scene);
+    const rect=assertPlacement(b.id,{x:request.x,y:request.y},scene,{placements:array(industry.placements)});
+    const placementId=uid(),jobId=uid();
+    const placement={id:placementId,colonyId:colony.id,buildingId:b.id,sceneId:scene.id,
+      tileId:'',jobId,x:rect.x,y:rect.y,width:rect.width,height:rect.height,
+      status:'finished',createdDay:day(),by:user.name};
+    const previous=array(industry.buildings).find(x=>x.id===b.id);
+    const buildings=[...array(industry.buildings).filter(x=>x.id!==b.id),
+      {id:b.id,count:built+1,builtDay:day(),lastClaimDay:previous?.lastClaimDay||0}];
+    const science=colony.system.science;
+    let tile;
+    try{
+      tile=(await scene.createEmbeddedDocuments('Tile',[asTileData(b.id,rect,
+        {colonyId:colony.id,jobId,placementId,status:'finished'})]))[0];
+      if(!tile?.id)throw Error('Foundry не создал тайл здания.');
+      placement.tileId=tile.id;
+      await colony.update({...patchIndustry({buildings,placements:[...array(industry.placements),placement],
+        history:history(industry,'gm-instant',`${b.name} · ${scene.name}`,user.name),
+        processed:processed(industry,request.id)}),
+        ...(b.facility?{'system.science.facilities':[...new Set([...array(science.facilities),b.facility])]}:{})});
+    }catch(error){
+      if(tile?.id){try{await scene.deleteEmbeddedDocuments('Tile',[tile.id]);}
+        catch(cleanup){console.error('GENESIS: failed to rollback instant building tile',cleanup);
+          throw Error('Здание не сохранено, проверьте оставшийся тайл на карте вручную.');}}
+      throw error;
+    }
+    result=`Ведущий разместил готовое здание без затрат: ${b.name}.`;
   }else if(action==='place-existing'){
     if(!user.isGM)throw Error('Размещать здания, построенные до 0.6, может только ведущий.');
     const b=BUILDING_BY_ID[request.subject];if(!b)throw Error('Такое сооружение не существует.');
@@ -438,7 +475,8 @@ export function industryContext(actor,user,precomputedSimulation=null){
   const craft=RECIPES.map(r=>{
     const status=recipeState(r.id,colony,1,stock);
     const stationOnline=isStationOnline(r.station);
-    return {...r,...status,stationReady:status.stationReady&&stationOnline,stationName:r.station?BUILDING_BY_ID[r.station]?.name||r.station:'Ручная работа',
+    return {...r,...status,hiddenForPlayer:!user.isGM&&!status.unlocked,
+      stationReady:status.stationReady&&stationOnline,stationName:r.station?BUILDING_BY_ID[r.station]?.name||r.station:'Ручная работа',
       outputName:r.name,outputQuantity:r.output.quantity,canQueue:canAct&&status.canStart&&stationOnline};
   });
   const indoor=Boolean(globalThis.canvas?.scene?.flags?.[SYSTEM]?.interiorOf);
@@ -455,7 +493,8 @@ export function industryContext(actor,user,precomputedSimulation=null){
     const mappedFinished=mappedById.get(b.id)||0;
     const allowedHere=!indoor||['bench','fieldLab','furnace','bioLab','electronicsLab'].includes(b.id);
     return {...b,...status,canQueue:allowedHere&&canAct&&status.canStart,
-      indoorRestricted:!allowedHere,
+      indoorRestricted:!allowedHere,hiddenForPlayer:!user.isGM&&!status.unlocked,
+      canGMInstant:user.isGM&&allowedHere&&status.built+status.underConstruction<b.max,
       legacyUnmapped:Math.max(0,status.built-mappedFinished),
       canPlaceLegacy:user.isGM&&status.built>mappedFinished,
       techName:status.unlocked?'Изучено':'Нужна технология',

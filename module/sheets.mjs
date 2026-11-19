@@ -527,12 +527,13 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         else if(action==='rest'&&this.document.type==='survivor')await requestRest(this.document.id,el.dataset.restKind);
         else if(action==='mission'){const colony=colonyFor(this.document);if(colony)await requestMission(colony.id);}
         else if(['work','invest','complete','facility','grant'].includes(action))await askResearch(this,action,el.dataset.techId,el.dataset.facilityId);
-        else if(action==='industry'&&['start-building','place-existing'].includes(el.dataset.industryAction)){
+        else if(action==='industry'&&['start-building','place-existing','gm-instant-build'].includes(el.dataset.industryAction)){
           const colony=colonyFor(this.document);
           const building=el.dataset.subject;
           const definition=game.projectGenesis?.buildings?.find(b=>b.id===building);
           if(colony&&definition)startPlacement({colonyId:colony.id,buildingId:building,buildingName:definition.name,
-            existing:el.dataset.industryAction==='place-existing'});
+            existing:el.dataset.industryAction==='place-existing',
+            instant:el.dataset.industryAction==='gm-instant-build'});
         }
         else if(action==='enter-room'){
           const colony=colonyFor(this.document);

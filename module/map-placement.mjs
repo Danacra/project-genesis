@@ -3,13 +3,14 @@
  */
 import { BUILDING_FOOTPRINTS,checkPlacement,sceneGeometry } from './map-rules.mjs';
 import { requestIndustry } from './industry.mjs';
+import {isCanvasEventTarget} from './canvas-target.mjs';
 import {assertCanPlaceInside} from './structure-rules.mjs';
 let active=null;
 const notify=message=>ui.notifications.warn(message);
-const isCanvasTarget=target=>target===canvas?.app?.canvas||target===canvas?.app?.view||target?.id==='board';
+const isCanvasTarget=target=>isCanvasEventTarget(target,canvas?.app?.view,document.getElementById('board'));
 function clientPoint(event){return canvas.canvasCoordinatesFromClient({x:event.clientX,y:event.clientY});}
 export function cancelPlacement(){active?.cancel();active=null;}
-export function startPlacement({colonyId,buildingId,buildingName,existing=false}){
+export function startPlacement({colonyId,buildingId,buildingName,existing=false,instant=false}){
   cancelPlacement();
   const scene=canvas?.scene;
   if(!canvas?.ready||!scene)return notify('Откройте локальную карту колонии перед размещением.');
@@ -21,7 +22,7 @@ export function startPlacement({colonyId,buildingId,buildingName,existing=false}
   overlay.innerHTML='<span></span>';
   document.body.append(overlay);
   const banner=document.createElement('div');banner.className='genesis-placement-banner';
-  const label=document.createElement('strong');label.textContent=`${existing?'Разместить готовое':'Новая стройка'}: ${buildingName}`;
+  const label=document.createElement('strong');label.textContent=`${instant?'Готовая постройка GM':existing?'Разместить готовое':'Новая стройка'}: ${buildingName}`;
   const guide=document.createElement('span');guide.textContent='ЛКМ — выбрать место · Esc / ПКМ — отмена';
   const close=document.createElement('button');close.type='button';close.textContent='Отмена';
   banner.append(label,guide,close);document.body.append(banner);
@@ -75,11 +76,11 @@ export function startPlacement({colonyId,buildingId,buildingName,existing=false}
     let accepted=false;
     try{
       accepted=await foundry.applications.api.DialogV2.confirm({window:{title:'Подтвердить строительную площадку'},
-        content:existing?'<p>Отметить ранее построенное здание на этой сцене? Материалы повторно не списываются.</p>':'<p>Начать строительство на выбранной сцене? Материалы будут списаны со склада колонии.</p>',
-        yes:{label:existing?'Разместить готовое':'Начать строительство'},no:{label:'Выбрать другое место'}});
+        content:instant?'<p>GM: создать ГОТОВОЕ здание без расхода ресурсов, исследования и ожидания? Лимит построек и правила размещения сохраняются.</p>':existing?'<p>Отметить ранее построенное здание на этой сцене? Материалы повторно не списываются.</p>':'<p>Начать строительство на выбранной сцене? Материалы будут списаны со склада колонии.</p>',
+        yes:{label:instant?'Поставить готовое':existing?'Разместить готовое':'Начать строительство'},no:{label:'Выбрать другое место'}});
     }catch{accepted=false;}
     if(stopped)return;
-    if(accepted){cancel();await requestIndustry({action:existing?'place-existing':'start-building',colonyId,subject:buildingId,
+    if(accepted){cancel();await requestIndustry({action:instant?'gm-instant-build':existing?'place-existing':'start-building',colonyId,subject:buildingId,
       sceneId:scene.id,x:position.x,y:position.y});}
     else submitting=false;
   },options);

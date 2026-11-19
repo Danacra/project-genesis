@@ -1,14 +1,17 @@
 /** GM scene editor for finite resource deposits. */
 import {snapNode,RESOURCE_NODES} from './crew-rules.mjs';
 import {requestCrew} from './crew.mjs';
+import {isCanvasEventTarget} from './canvas-target.mjs';
+import {sceneGeometry} from './map-rules.mjs';
 let active=null;
-const onCanvas=e=>e.target===canvas?.app?.canvas||e.target===canvas?.app?.view||e.target?.id==='board';
+const onCanvas=e=>isCanvasEventTarget(e.target,canvas?.app?.view,document.getElementById('board'));
 export function stopResourcePlacement(){active?.();active=null;}
 export function startResourcePlacement({colonyId,resourceCode,amount}){
   stopResourcePlacement();
   if(!game.user.isGM)return ui.notifications.warn('Месторождения размещает ведущий.');
   const scene=canvas?.scene,resource=RESOURCE_NODES[resourceCode];
   if(!canvas?.ready||!scene||!resource)return ui.notifications.warn('Откройте локальную сцену с квадратной сеткой.');
+  try{sceneGeometry(scene);}catch(error){return ui.notifications.warn(error.message);}
   let stopped=false,busy=false,cursor=null;
   const ghost=document.createElement('div');ghost.className='genesis-map-ghost genesis-resource-ghost';ghost.style.display='none';
   const bar=document.createElement('div');bar.className='genesis-placement-banner';
@@ -52,5 +55,5 @@ export function startResourcePlacement({colonyId,resourceCode,amount}){
     }catch(error){busy=false;ui.notifications.warn(error.message);}
   },option);
   active=clear;
-  ui.notifications.info(`Выберите место для ресурса «${resource.name}» на карте.`);
+  ui.notifications.info(`Выберите свободную клетку для ресурса «${resource.name}». Если карта закрыта листом, сверните лист колонии.`);
 }

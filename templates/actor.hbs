@@ -100,7 +100,7 @@
       <div class="genesis-research-header">
         <div><span class="genesis-kicker">PROJECT GENESIS / SCIENCE & DISCOVERY</span><h2>Древо технологий</h2>
           <p class="genesis-muted">Общая научная программа «{{research.colonyName}}». Открытия сохраняются в колонии.</p></div>
-        <div class="genesis-research-metrics"><div><strong>{{research.science.points}}</strong><small>Свободных ОИ</small></div><div><strong>{{research.progressCount}} / {{research.techCount}}</strong><small>Изучено</small></div>
+        <div class="genesis-research-metrics"><div><strong>{{research.science.points}}</strong><small>Свободных ОИ</small></div><div><strong>{{research.progressCount}} / {{#if isGM}}{{research.techCount}}{{else}}?{{/if}}</strong><small>Изучено</small></div>
           {{#if isGM}}<button type="button" data-genesis-action="grant" title="Начисление очков ведущим">+ Начислить ОИ</button>{{/if}}
         </div>
       </div>
@@ -243,7 +243,7 @@
     {{#if research.available}}
       <div class="genesis-toolbar"><div><h2>Каталог чертежей</h2><p class="genesis-muted">Открытые чертежи можно изготовить в разделе «Производство», если на базе есть нужный станок и ресурсы.</p></div></div>
       <div class="genesis-recipe-grid">{{#each research.recipes}}
-        <article class="genesis-recipe {{#unless unlocked}}is-locked{{/unless}}"><span>{{#if unlocked}}✓ ДОСТУПЕН{{else}}◇ НЕ ИЗУЧЕН{{/if}}</span><strong>{{name}}</strong><small>{{techName}}</small></article>
+        <article class="genesis-recipe {{#unless unlocked}}is-locked{{/unless}}"><span>{{#if unlocked}}✓ ДОСТУПЕН{{else}}◇ НЕИЗВЕСТНО{{/if}}</span><strong>{{name}}</strong><small>{{techName}}</small></article>
       {{/each}}</div>
     {{else}}<p>Сначала создайте колонию.</p>{{/if}}
   </div>
@@ -262,6 +262,9 @@
     </div>
     <div class="genesis-panel"><div class="genesis-toolbar"><div><h3>Библиотека рецептов</h3><p class="genesis-muted">27 рецептов из древа технологий · стоимость указана на одну партию</p></div></div>
       <div class="genesis-production-grid">{{#each industry.craft}}
+      {{#if hiddenForPlayer}}
+      <article class="genesis-product-card genesis-discovery-secret" aria-label="Неизвестный рецепт"><div class="genesis-secret-icon" aria-hidden="true">?</div><h3>???</h3><p>Чертёж ещё не открыт</p></article>
+      {{else}}
       <article class="genesis-product-card {{#unless unlocked}}is-locked{{/unless}}">
         <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ИЗУЧЕНО{{else}}◇ ЗАКРЫТО{{/if}}</span><span class="genesis-product-duration">{{days}} сут./партия</span></div>
         <h3>{{name}}</h3><p class="genesis-product-desc">{{description}}</p>
@@ -269,7 +272,7 @@
         <div class="genesis-production-meta"><span>ВЫХОД</span><strong>{{outputQuantity}} шт./партия</strong></div>
         <div class="genesis-material-grid">{{#each materials}}<div class="genesis-material-chip {{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></div>{{/each}}</div>
         {{#if ../industry.canAct}}<button type="button" class="genesis-primary genesis-product-button" data-genesis-action="industry" data-industry-action="start-recipe" data-subject="{{id}}" {{#unless canQueue}}disabled{{/unless}}>Поставить в очередь</button>{{/if}}
-      </article>{{/each}}</div>
+      </article>{{/if}}{{/each}}</div>
     </div>
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Создайте актора типа «Колония», чтобы использовать общий производственный комплекс.</p></div>{{/if}}
   </div>
@@ -301,8 +304,11 @@
           <button type="button" data-genesis-action="map-location" data-scene-id="{{sceneId}}" data-x="{{x}}" data-y="{{y}}">Найти на карте</button></article>
       {{else}}<p class="genesis-muted">Пока ни одно сооружение не размещено на карте.</p>{{/each}}</div>
     </div>
-    <div class="genesis-panel"><h3>Каталог сооружений</h3>
+    <div class="genesis-panel"><h3>Каталог сооружений</h3><p class="genesis-muted">Обычное строительство требует изучения технологии и материалов. GM может мгновенно поставить готовое сооружение для тестирования с помощью отдельной кнопки — без траты материалов.</p>
       <div class="genesis-production-grid">{{#each industry.buildings}}
+        {{#if hiddenForPlayer}}
+        <article class="genesis-product-card genesis-building-card genesis-discovery-secret" aria-label="Неизвестное сооружение"><div class="genesis-secret-icon" aria-hidden="true">?</div><h3>???</h3><p>Сооружение пока не открыто</p></article>
+        {{else}}
         <article class="genesis-product-card genesis-building-card {{#unless unlocked}}is-locked{{/unless}}">
           <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ДОСТУПНО{{else}}◇ НУЖНО ИССЛЕДОВАНИЕ{{/if}}</span><span class="genesis-product-duration">{{days}} сут.</span></div>
           <h3>{{name}}</h3><p class="genesis-product-desc">{{description}}</p>
@@ -310,9 +316,10 @@
           <div class="genesis-material-grid">{{#each materials}}<div class="genesis-material-chip {{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></div>{{/each}}</div>
           {{#if indoorRestricted}}<p class="genesis-tech-alert">Этот объект строится только снаружи помещения.</p>{{/if}}
           {{#if ../industry.canAct}}<button type="button" class="genesis-primary genesis-product-button" data-genesis-action="industry" data-industry-action="start-building" data-subject="{{id}}" {{#unless canQueue}}disabled{{/unless}}>Разместить на карте</button>{{/if}}
+          {{#if canGMInstant}}<button type="button" class="genesis-gm-build" data-genesis-action="industry" data-industry-action="gm-instant-build" data-subject="{{id}}">Поставить готовое (GM, бесплатно)</button>{{/if}}
           {{#if canPlaceLegacy}}<button type="button" class="genesis-legacy-button" data-genesis-action="industry" data-industry-action="place-existing" data-subject="{{id}}">Отметить готовое на карте ({{legacyUnmapped}})</button>{{/if}}
           {{#if harvest}}{{#if ../industry.canAct}}<button type="button" class="genesis-harvest-button" data-genesis-action="industry" data-industry-action="harvest" data-subject="{{id}}" {{#unless canHarvest}}disabled{{/unless}}>{{#if harvested}}Уже собрано сегодня{{else}}Получить продукцию дня{{/if}}</button>{{/if}}{{/if}}
-        </article>{{/each}}</div>
+        </article>{{/if}}{{/each}}</div>
     </div>
     <div class="genesis-panel"><h3>Производственный журнал</h3><div class="genesis-log">
       {{#each industry.history}}<article><span>День {{day}} · {{kind}}</span><strong>{{name}}</strong><small>{{by}}</small></article>
@@ -398,7 +405,7 @@
           <button type="button" data-genesis-action="crew" data-crew-action="cancel" data-job-id="{{id}}">Отменить</button>{{/if}}
         </article>{{else}}<p class="genesis-muted">Нет активных заданий.</p>{{/each}}</div></div>
       <div class="genesis-panel"><h3>Ресурсы на локальных картах</h3>
-        {{#if crew.isGM}}<p class="genesis-muted">Размещайте новые месторождения на локальной квадратной сцене. Ведущий определяет запас ресурса; он ограничен и не восстанавливается автоматически.</p>
+        {{#if crew.isGM}}<p class="genesis-muted">Размещайте новые месторождения на <strong>открытой сцене с квадратной сеткой</strong>: выберите ресурс, задайте запас, сверните лист колонии и щёлкните ЛКМ по свободной клетке карты. ПКМ или Esc отменяют выбор.</p>
         <div class="genesis-crew-toolbar genesis-resource-choices">
           {{#each crew.resourceTypes}}<button type="button" data-genesis-action="crew" data-crew-action="create-node" data-resource-code="{{id}}">+ {{name}}</button>{{/each}}
         </div>{{/if}}

@@ -2,6 +2,7 @@
 import { TECHNOLOGIES, TECHNOLOGY_BY_ID, RESEARCH_BY_ID, FIELD_STUDIES, FIELD_PHASES, BRANCHES, FACILITIES, RECIPE_LIBRARY } from './tech-data.mjs';
 import { techStatus, planInvestment, planMaterialUse, completionPatch, unlockedRecipes } from './research-rules.mjs';
 import { withWorldLock } from './logistics.mjs';
+import {availableEras,availableFieldPhases,obscureBlueprints} from './discovery-visibility.mjs';
 import { stationOperational } from './networks.mjs';
 const SYSTEM='project-genesis';
 const pending=new Map();
@@ -34,7 +35,9 @@ export function researchContext(colony, user, networkSimulation=null) {
       canWork:t.id!=='survey'&&!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
       canFinish:status.canFinish&&powerReady,investBlockedReason}];
   }));
-  const eras=[0,1,2,3,4].map(t=>({tier:t,label:['01 · ПОЛЕВОЙ ЭТАП','02 · РЕМЕСЛО','03 · НАУЧНАЯ БАЗА','04 · ПРОМЫШЛЕННОСТЬ','05 · КОСМОС'][t],nodes:TECHNOLOGIES.filter(x=>x.t===t).map(x=>({
+  const eraAccess=availableEras(TECHNOLOGIES,science.unlocked,user.isGM);
+  const phaseAccess=availableFieldPhases(FIELD_PHASES,FIELD_STUDIES,science.unlocked,user.isGM);
+  const eras=[0,1,2,3,4].filter(t=>eraAccess.has(t)).map(t=>({tier:t,label:['01 · ПОЛЕВОЙ ЭТАП','02 · РЕМЕСЛО','03 · НАУЧНАЯ БАЗА','04 · ПРОМЫШЛЕННОСТЬ','05 · КОСМОС'][t],nodes:TECHNOLOGIES.filter(x=>x.t===t).map(x=>({
     ...x,...statusMap[x.id],branchLabel:BRANCHES[x.branch],shortParent:x.parents.length,
     statusLabel:x.id==='survey'?`${statusMap[x.id].progress}/10 исследований · ${statusMap[x.id].unlocked?'завершено':'открыть'}`:
       statusMap[x.id].unlocked?'Изучено':statusMap[x.id].canFinish?'Готово к открытию':statusMap[x.id].missingParents.length?'Заблокировано':`${statusMap[x.id].progress}/${x.rp} ОИ`
@@ -44,30 +47,30 @@ export function researchContext(colony, user, networkSimulation=null) {
   const availablePeople=game.actors.filter(a=>a.type==='survivor' && (user.isGM||a.testUserPermission(user,'OWNER')))
     .map(a=>({id:a.id,name:a.name,used:workedToday.has(a.id)}));
   const branches=Object.entries(BRANCHES).map(([id,label])=>({id,label}));
-  const subPhases=FIELD_PHASES.map(phase=>({...phase,nodes:FIELD_STUDIES.filter(t=>t.phase===phase.id).map(t=>({
+  const subPhases=FIELD_PHASES.filter(phase=>phaseAccess.has(phase.id)).map(phase=>({...phase,nodes:FIELD_STUDIES.filter(t=>t.phase===phase.id).map(t=>({
     ...t,...statusMap[t.id],branchLabel:BRANCHES[t.branch],
     statusLabel:statusMap[t.id].unlocked?'Изучено':!statusMap[t.id].prerequisitesReady?'Требует открытий':`${statusMap[t.id].progress}/${t.rp} ОИ`,
     parentNames:t.parents.map(id=>RESEARCH_BY_ID[id].name)
   }))}));
-  const subDetails=FIELD_STUDIES.map(tech=>({
+  const subDetails=FIELD_STUDIES.filter(tech=>phaseAccess.has(tech.phase)).map(tech=>({
     ...tech,...statusMap[tech.id],branchLabel:BRANCHES[tech.branch],
     remaining:Math.max(0,tech.rp-statusMap[tech.id].progress),
     missingParentNames:statusMap[tech.id].missingParents.map(id=>RESEARCH_BY_ID[id].name),
     parentsNames:tech.parents.map(id=>RESEARCH_BY_ID[id].name)
   }));
-  const details=TECHNOLOGIES.map(tech=>({
+  const details=TECHNOLOGIES.filter(tech=>eraAccess.has(tech.t)).map(tech=>({
     ...tech,...statusMap[tech.id],branchLabel:BRANCHES[tech.branch],epochDisplay:tech.t+1,
     missingParentNames:statusMap[tech.id].missingParents.map(id=>TECHNOLOGY_BY_ID[id].name),
     missingFacilityNames:statusMap[tech.id].missingFacilities.map(id=>FACILITIES[id]),
     requiredFacilityNames:tech.facilities.map(id=>FACILITIES[id]),
     parentsNames:tech.parents.map(id=>TECHNOLOGY_BY_ID[id].name),
-    recipesNames:tech.recipes.map(id=>RECIPE_LIBRARY[id]||id),
+    recipesNames:tech.recipes.map(id=>user.isGM||statusMap[tech.id].unlocked?(RECIPE_LIBRARY[id]||id):'???'),
     remaining:tech.id==='survey'?0:Math.max(0,tech.rp-statusMap[tech.id].progress)
   }));
   return {available:true,colonyId:colony.id,colonyName:colony.name,science,eras,details,subPhases,subDetails,
     subDone:statusMap.survey.progress,subTotal:FIELD_STUDIES.length,subComplete:statusMap.survey.unlocked,
     statusMap,branches,facilities:Object.entries(FACILITIES).map(([id,name])=>({id,name,active:(science.facilities||[]).includes(id)})),
-    recipes:unlockedRecipes(science),canResearch:user.isGM||availablePeople.length>0,
+    recipes:obscureBlueprints(unlockedRecipes(science),user.isGM),canResearch:user.isGM||availablePeople.length>0,
     people:availablePeople,history:[...(science.discoveries||[])].reverse().map(d=>({...d,techName:RESEARCH_BY_ID[d.techId]?.name||d.techId})),day:day(),isGM:user.isGM,
     progressCount:TECHNOLOGIES.filter(t=>statusMap[t.id].unlocked).length,techCount:TECHNOLOGIES.length};
 }

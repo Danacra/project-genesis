@@ -40,17 +40,17 @@ const build = (id,name,techId,inputs,days=2,facility=null,options={}) => Object.
 });
 export const BUILDINGS = Object.freeze([
   build('bench','Верстак','stone-tools',{wood:3,stone:2},1,'bench',{description:'Простой рабочий пост для базовых рецептов.'}),
-  build('fieldLab','Полевая лаборатория','water-analysis',{wood:2,scrap:1,sample:2},2,'fieldLab'),
-  build('furnace','Промышленная мастерская','geology',{stone:5,clay:3,scrap:2},3,'furnace'),
-  build('bioLab','Биолаборатория','medicine',{glass:2,scrap:3,organic:2},3,'bioLab'),
-  build('powerLab','Энергетическая станция','mechanics',{copper:3,scrap:3},3,'powerLab'),
-  build('electronicsLab','Лаборатория электроники','optics',{silicon:2,copper:2,glass:2},4,'electronicsLab'),
-  build('flightLab','Испытательный комплекс','industrial-fabrication',{alloy:5,glass:3,circuit:2},5,'flightLab'),
+  build('fieldLab','Полевая лаборатория','water-analysis',{wood:2,scrap:1,sample:2},2,'fieldLab',{description:'Полевые исследования и изготовление научных комплектов; ручной режим возможен без питания.'}),
+  build('furnace','Промышленная мастерская','geology',{stone:5,clay:3,scrap:2},3,'furnace',{description:'Производит сплавы, стеклокерамику и промышленные детали по изученным рецептам.'}),
+  build('bioLab','Биолаборатория','medicine',{glass:2,scrap:3,organic:2},3,'bioLab',{description:'Лаборатория биологических исследований и специальных материалов, поддерживает соответствующий крафт.'}),
+  build('powerLab','Энергетическая станция','mechanics',{copper:3,scrap:3},3,'powerLab',{description:'Источник 18 условных единиц мощности для электросети базы; подключение выполняется кабелями.'}),
+  build('electronicsLab','Лаборатория электроники','optics',{silicon:2,copper:2,glass:2},4,'electronicsLab',{description:'Создаёт электронные компоненты, панели управления и навигационные детали. Требует электричества.'}),
+  build('flightLab','Испытательный комплекс','industrial-fabrication',{alloy:5,glass:3,circuit:2},5,'flightLab',{description:'Станция космических технологий и позднего производства. Требует электропитания и инженерных сетей.'}),
   build('local-store','Локальный склад','basic-workshop',{wood:4,stone:3,scrap:2},2,null,{max:12,capacityMass:750,capacityVolume:1500,description:'Отдельное хранилище на карте. Не объединяется с общим складом; станки на этой карте могут использовать его запасы.'}),
   build('storehouse','Складской модуль','basic-workshop',{wood:5,stone:3,scrap:2},2,null,{max:8,capacityMass:750,capacityVolume:1500,description:'Каждый модуль увеличивает общую вместимость колонии.'}),
   build('garden','Тепличный модуль','agriculture',{wood:3,organic:3,fiber:3},3,null,{harvest:{code:'food',name:'Пищевой паёк',type:'consumable',quantity:3,unitMass:.4,unitVolume:.5},description:'Даёт 3 абстрактных пищевых пайка раз в игровые сутки.'}),
   build('water-recycler','Станция воды','fluid-systems',{alloy:2,glass:2,scrap:2},3,null,{harvest:{code:'water',name:'Запас воды',type:'consumable',quantity:5,unitMass:.5,unitVolume:.5},description:'Даёт 5 игровых единиц воды раз в сутки.'}),
-  build('shelter','Жилой модуль','shelter',{wood:4,fiber:4,stone:2},2,null,{description:'Отмечает развитие жилой инфраструктуры.'}),
+  build('shelter','Жилой модуль','shelter',{wood:4,fiber:4,stone:2},2,null,{description:'Жилое помещение с внутренней сценой; ускоряет восстановление усталости и поддерживает штатное освещение при питании.'}),
   build('room','Помещение-мастерская','basic-workshop',{wood:6,stone:5,scrap:3},3,null,{max:8,description:'Отдельная внутренняя сцена с возможностью разместить станки и подключить наружное электропитание.'}),
   build('assembly-dock','Сборочный док','orbital-systems',{hull_sections:2,precision_parts:2,alloy:4},6,null,{description:'Основа четырёхэтапной программы сборки корабля экспедиции.'})
 ]);
