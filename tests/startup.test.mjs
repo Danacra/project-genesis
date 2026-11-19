@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 const hooks={};
 class Field {constructor(options,metadata){this.options=options;this.metadata=metadata;}}
 class TypeDataModel {}
+class BooleanField extends Field {}
 class BaseSheet {static editImage() {}}
-globalThis.foundry={data:{fields:{NumberField:Field,StringField:Field,SchemaField:Field,ArrayField:Field}},
+globalThis.foundry={data:{fields:{NumberField:Field,StringField:Field,SchemaField:Field,ArrayField:Field,BooleanField}},
   abstract:{TypeDataModel},
   applications:{api:{HandlebarsApplicationMixin:Base=>Base,DialogV2:class {}},
     sheets:{ActorSheetV2:BaseSheet,ItemSheetV2:BaseSheet},

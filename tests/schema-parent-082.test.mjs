@@ -10,6 +10,7 @@ class DataField {
   }
 }
 class NumberField extends DataField {}
+class BooleanField extends DataField {}
 class StringField extends DataField {}
 class SchemaField extends DataField {
   constructor(fields, options = {}) {
@@ -25,7 +26,7 @@ class ArrayField extends DataField {
 }
 class TypeDataModel {}
 globalThis.foundry = {
-  data: {fields: {NumberField, StringField, SchemaField, ArrayField}},
+  data: {fields: {NumberField, StringField, SchemaField, ArrayField, BooleanField}},
   abstract: {TypeDataModel}
 };
 const models = await import('../module/models.mjs');
