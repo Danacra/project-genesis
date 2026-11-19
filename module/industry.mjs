@@ -3,15 +3,18 @@ import { RECIPES, RECIPE_BY_ID, BUILDINGS, BUILDING_BY_ID, resourceName } from '
 import { recipeState, buildingState, buildingCount, planTake, outputItem, depositPlan, refundPlan, tickQueue } from './industry-rules.mjs';
 import { withWorldLock } from './logistics.mjs';
 import { colonyFor } from './research.mjs';
-import { stockByCode } from './research-rules.mjs';
+import { stockByCode, effectiveUnlocked } from './research-rules.mjs';
+import { tierUpgrade,tierOf,stationSupportsRecipe } from './building-progress.mjs';
+import { validateStagedInputs,craftLoadFits } from './crafting-rules.mjs';
 import { assertPlacement, asTileData, tileAsset, placementHealth, assertHealthyPlacement, validateTileLink } from './map-rules.mjs';
 import { stationOperational,placementOperational,getNetworkSimulation } from './networks.mjs';
 import {isInteriorBuilding,isCraftStation,salvageFor,structureBlockers,assertCanPlaceInside,assertInteriorOwnership} from './structure-rules.mjs';
 import {capacity,summarizeInventory} from './rules.mjs';
 import {RESOURCE_NODES,crewState,stockFor,setStock} from './crew-rules.mjs';
+import {iconForCode} from './icon-map.mjs';
 import {LOCAL_WAREHOUSE,warehouseNearStation,localStockCounts,planLocalTake,restoreLocalTake,localOutput} from './local-storage-rules.mjs';
 const SYSTEM='project-genesis', TIMEOUT=60000, MAX_JOBS=40;
-const outstanding=new Map(), handled=new Set();
+const outstanding=new Map(), craftAwaiters=new Map(), handled=new Set();
 const array=value=>Array.isArray(value)?value:[];
 const gmLeader=()=>game.users.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id.localeCompare(b.id))[0]||null;
 const notify=(message,error=false)=>error?ui.notifications.error(message):ui.notifications.info(message);
@@ -96,7 +99,72 @@ async function commit(request){
   if(handled.has(request.id)||array(industry.processed).includes(request.id))return 'Повторная операция проигнорирована.';
   const {action}=request;
   let result='';
-  if(action==='start-recipe'){
+  if(action==='craft-now'){
+    const placement=array(industry.placements).find(p=>p.id===request.stationPlacementId);
+    const recipe=RECIPE_BY_ID[request.subject];
+    if(!recipe||!recipe.station||!placement||placement.status!=='finished'||!(stationSupportsRecipe(placement,recipe)||(!recipe.station&&placement.buildingId==='bench')))
+      throw Error('У станка нет этого чертежа или требуется улучшение уровня.');
+    if(!effectiveUnlocked(colony.system.science).has(recipe.techId))
+      throw Error('Чертёж ещё не исследован.');
+    const scene=game.scenes.get(placement.sceneId);
+    assertHealthyPlacement(placement,scene,scene?.tiles?.get?.(placement.tileId));
+    if(!placementOperational(colony,placement))throw Error('Станок обесточен или не подключён к необходимым сетям.');
+    if(array(industry.jobs).some(j=>j.stationPlacementId===placement.id&&Number(j.remaining)>0))
+      throw Error('Станок сейчас занят производственным заказом.');
+    if(!user.isGM){
+      const grid=Number(scene.grid?.size)||100;
+      const nearby=[...(scene.tokens||[])].some(token=>{
+        const actor=game.actors.get(token.actorId);
+        if(actor?.type!=='survivor'||!actor.testUserPermission(user,'OWNER'))return false;
+        const dx=Math.max(0,placement.x-Number(token.x),Number(token.x)-(placement.x+placement.width));
+        const dy=Math.max(0,placement.y-Number(token.y),Number(token.y)-(placement.y+placement.height));
+        return Math.max(dx,dy)<=2*grid;
+      });
+      if(!nearby)throw Error('Подойдите своим токеном к станку на этой сцене.');
+    }
+    validateStagedInputs(recipe,request.staged);
+    const product=outputItem(recipe,1);
+    const sourceKind=String(request.sourceKind||'');
+    const updated={history:history(industry,'craft',`${recipe.name} ×${product.system.quantity} · ${sourceKind}`,user.name),
+      processed:processed(industry,request.id)};
+    if(sourceKind==='local'){
+      const store=array(industry.placements).find(p=>p.id===request.sourcePlacementId);
+      if(!warehouseNearStation(placement,store,game.scenes))throw Error('Локальный склад не связан с этим станком.');
+      const ss=game.scenes.get(store.sceneId);
+      assertHealthyPlacement(store,ss,ss?.tiles?.get?.(store.tileId));
+      const before=stockFor(crewState(colony),store.id);
+      const taken=planLocalTake(before,recipe.inputs,1);
+      const output=localOutput(taken.stock,product,store); // capacity validated before any write
+      await colony.update({...patchIndustry(updated),'system.crew.caches':setStock(crewState(colony),store.id,output)});
+    }else{
+      const actor=sourceKind==='colony'?colony:sourceKind==='actor'?game.actors.get(request.sourceActorId):null;
+      if(!actor||!['survivor','colony'].includes(actor.type))throw Error('Источник материалов не найден.');
+      if(sourceKind==='actor'){
+        if(!user.isGM&&!actor.testUserPermission(user,'OWNER'))throw Error('Можно крафтить только из собственного инвентаря.');
+        if(!user.isGM&&![...(scene.tokens||[])].some(t=>t.actorId===actor.id))
+          throw Error('Для крафта из личного инвентаря разместите токен выжившего рядом со станком.');
+      }
+      const plan=planTake(actor.items,recipe.inputs,1);
+      craftLoadFits(actor.items,plan,product,capacity(actor));
+      const originals=plan.changes.map(c=>({_id:c._id,'system.quantity':Number(actor.items.get(c._id)?.system.quantity||0)}));
+      let debited=false,created=[];
+      try{
+        // Keep original stacks; do not delete them before the operation is committed.
+        debited=true;
+        await actor.updateEmbeddedDocuments('Item',plan.changes);
+        created=await actor.createEmbeddedDocuments('Item',[product]);
+        await colony.update(patchIndustry(updated));
+      }catch(error){
+        try{
+          if(created.length)await actor.deleteEmbeddedDocuments('Item',created.map(item=>item.id));
+          if(debited)await actor.updateEmbeddedDocuments('Item',originals);
+        }catch(restore){console.error('GENESIS: crafting rollback failed',restore);
+          throw Error('Не удалось откатить крафт: GM должен сверить инвентарь вручную.');}
+        throw error;
+      }
+    }
+    result=`Изготовлено: ${recipe.name} ×${product.system.quantity}.`;
+  }else if(action==='start-recipe'){
     const localId=String(request.sourcePlacementId||'');
     let warehouse=null,localStock=[];
     if(localId){
@@ -113,8 +181,8 @@ async function commit(request){
     if(!status.stationReady)throw Error('Не построена необходимая мастерская / лаборатория.');
     if(request.stationPlacementId){
       const placement=array(industry.placements).find(p=>p.id===request.stationPlacementId);
-      if(!placement||placement.status!=='finished'||placement.buildingId!==status.recipe.station)
-        throw Error('Этот станок не производит выбранный рецепт.');
+      if(!placement||placement.status!=='finished'||!stationSupportsRecipe(placement,status.recipe))
+        throw Error('Этот станок не производит рецепт или требует повышения уровня.');
       const scene=game.scenes.get(placement.sceneId);
       assertHealthyPlacement(placement,scene,scene?.tiles?.get?.(placement.tileId));
       if(!placementOperational(colony,placement))throw Error('Станок не работает: проверьте внешнее питание помещения и подключение инженерных сетей.');
@@ -122,22 +190,53 @@ async function commit(request){
     if(!status.canStart)throw Error('На складе недостаточно материалов.');
     if(array(industry.jobs).length>=MAX_JOBS)throw Error('Очередь производства заполнена.');
     const r=status.recipe;
+    const workingStation=array(industry.placements).find(p=>p.id===request.stationPlacementId);
+    const speed=[0,1,.8,.65][tierOf(workingStation)];
+    const queueDays=Math.max(1,Math.ceil(r.days*Number(request.amount)*speed));
     if(localId){
       // Single Actor update writes both source cache and the production order.
       // If it rejects, neither part is committed; retry cannot debit twice.
       const plan=planLocalTake(localStock,r.inputs,Number(request.amount));
-      const row=jobRow(r.name,r.id,Number(request.amount),r.days*Number(request.amount),user.name,user.id,plan.reserved,localId,String(request.stationPlacementId||''));
+      const row=jobRow(r.name,r.id,Number(request.amount),queueDays,user.name,user.id,plan.reserved,localId,String(request.stationPlacementId||''));
       await colony.update({...patchIndustry({
         jobs:[...array(industry.jobs),row],history:history(industry,'start',`${r.name} ×${row.amount} · локальный склад`,user.name),processed:processed(industry,request.id)
       }),'system.crew.caches':setStock(crewState(colony),localId,plan.stock)});
     }else{
       const plan=planTake(colony.items,r.inputs,Number(request.amount));
-      const row=jobRow(r.name,r.id,Number(request.amount),r.days*Number(request.amount),user.name,user.id,plan.escrow,'',String(request.stationPlacementId||''));
+      const row=jobRow(r.name,r.id,Number(request.amount),queueDays,user.name,user.id,plan.escrow,'',String(request.stationPlacementId||''));
       await debitAndCommit(colony,plan,{
         jobs:[...array(industry.jobs),row],history:history(industry,'start',`${r.name} ×${row.amount}`,user.name),processed:processed(industry,request.id)
       });
     }
-    result=`Добавлено в очередь: ${r.name} · ${r.days*Number(request.amount)} сут.`;
+    result=`Добавлено в очередь: ${r.name} · ${queueDays} сут.`;
+  }else if(action==='upgrade-building'){
+    const placement=array(industry.placements).find(p=>p.id===request.placementId);
+    if(!placement||placement.status!=='finished')throw Error('Сначала постройте здание.');
+    const scene=game.scenes.get(placement.sceneId),tile=scene?.tiles?.get?.(placement.tileId);
+    assertHealthyPlacement(placement,scene,tile);
+    const plan=tierUpgrade(placement);
+    const free=!!request.gmFree;
+    if(free&&!user.isGM)throw Error('Бесплатно улучшать здания может только GM.');
+    if(!free&&!effectiveUnlocked(colony.system.science).has(plan.techId))
+      throw Error('Требуется изучение: '+plan.techId+'.');
+    const newPlacements=array(industry.placements).map(p=>p.id===placement.id?{...p,tier:plan.next}:p);
+    const update={placements:newPlacements,history:history(industry,'upgrade',`${plan.building.name} · уровень ${plan.next}`,user.name),
+      processed:processed(industry,request.id)};
+    const previousTexture=tile.texture?.src||'';
+    // Do not replace user-authored art. Only swap standard package sprites.
+    const standard=`systems/${SYSTEM}/assets/buildings/${plan.building.id}`;
+    const replaceArt=previousTexture.startsWith(standard)&&previousTexture.endsWith('.png');
+    if(replaceArt)await tile.update({'texture.src':tileAsset(plan.building.id,true,plan.next),
+      [`flags.${SYSTEM}.tier`]:plan.next});
+    try{
+      if(free)await colony.update(patchIndustry(update));
+      else await debitAndCommit(colony,planTake(colony.items,plan.inputs),update);
+    }catch(error){
+      if(replaceArt){try{await tile.update({'texture.src':previousTexture,[`flags.${SYSTEM}.tier`]:plan.current});}
+        catch(e){console.error('GENESIS: upgrade art rollback failed',e);}}
+      throw error;
+    }
+    result=`Улучшено: ${plan.building.name} · уровень ${plan.next}${free?' (GM бесплатно)':''}.`;
   }else if(action==='start-building'){
     const status=buildingState(request.subject,colony);
     if(!status.unlocked)throw Error('Для здания не изучена технология.');
@@ -288,7 +387,7 @@ async function commit(request){
     const reserve=Object.entries(materials).map(([code,count])=>{
       const spec=RESOURCE_NODES[code]||RECIPES.find(r=>r.output.code===code)?.output||{};
       return {itemId:'',count,code,name:resourceName(code),type:'material',
-        img:RESOURCE_NODES[code]?`systems/${SYSTEM}/assets/resources/${code}.svg`:'icons/svg/item-bag.svg',
+        img:iconForCode(code),
         unitMass:Number(spec.mass??spec.unitMass??1),unitVolume:Number(spec.volume??spec.unitVolume??1),
         quality:0,techTier:0,description:'Возврат при разборке',containerId:''};
     });
@@ -463,7 +562,9 @@ async function commit(request){
     if(!b?.harvest||!current?.count)throw Error('Такое хозяйство ещё не построено.');
     if(current.lastClaimDay>=day())throw Error('Продукция уже получена сегодня.');
     if(!stationOperational(colony,b.id))throw Error('Хозяйственный объект не обеспечен энергией или водой.');
-    const item=outputItem({name:b.harvest.name,description:b.description,output:b.harvest},current.count);
+    const mappedFarms=array(industry.placements).filter(p=>p.buildingId===b.id&&p.status==='finished');
+    const levelCount=mappedFarms.reduce((sum,p)=>sum+tierOf(p),0)+Math.max(0,current.count-mappedFarms.length);
+    const item=outputItem({name:b.harvest.name,description:b.description,output:b.harvest},levelCount);
     await depositAndCommit(colony,item,patchIndustry({
       buildings:array(industry.buildings).map(x=>x.id===b.id?{...x,lastClaimDay:day()}:x),
       history:history(industry,'harvest',`${b.harvest.name} ×${item.system.quantity}`,user.name),
@@ -491,7 +592,7 @@ export function industryContext(actor,user,precomputedSimulation=null){
     const stationOnline=isStationOnline(r.station);
     return {...r,...status,hiddenForPlayer:!user.isGM&&!status.unlocked,
       stationReady:status.stationReady&&stationOnline,stationName:r.station?BUILDING_BY_ID[r.station]?.name||r.station:'Ручная работа',
-      outputName:r.name,outputQuantity:r.output.quantity,canQueue:canAct&&status.canStart&&stationOnline};
+      outputName:r.name,outputQuantity:r.output.quantity,tierRequired:r.minTier||1,canQueue:canAct&&status.canStart&&stationOnline};
   });
   const indoor=Boolean(globalThis.canvas?.scene?.flags?.[SYSTEM]?.interiorOf);
   const builtById=new Map(array(industry.buildings).map(b=>[b.id,b]));
@@ -530,7 +631,15 @@ export function industryContext(actor,user,precomputedSimulation=null){
     placements:array(industry.placements).map(p=>{
       const scene=game.scenes.get(p.sceneId),tile=scene?.tiles?.get(p.tileId);
       const health=placementHealth(p,scene,tile);
-      return {...p,name:BUILDING_BY_ID[p.buildingId]?.name||p.buildingId,
+      const tier=tierOf(p);
+      const next=tier<3?tierUpgrade(p):null;
+      const canUpgrade=!!next&&effectiveUnlocked(colony.system.science).has(next.techId);
+      return {...p,tier,tierMark:['','◆','◆◆','◆◆◆'][tier],
+        upgradeCost:next?Object.entries(next.inputs).map(([code,count])=>`${resourceName(code)} ×${count}`).join(' · '):'',
+        upgradeTech:next?.techId||'',nextTier:next?.next||0,
+        canUpgrade:canAct&&canUpgrade&&p.status==='finished'&&health==='ok'&&!p.gmInstant,
+        canGMUpgrade:user.isGM&&!!next&&p.status==='finished'&&health==='ok',
+        name:BUILDING_BY_ID[p.buildingId]?.name||p.buildingId,
         sceneName:scene?.name||'Удалённая сцена',isFinished:p.status==='finished',
         canDismantle:user.isGM&&p.status==='finished'&&health==='ok'&&!p.gmInstant,
         canErase:user.isGM&&p.status==='finished',
@@ -563,10 +672,29 @@ export async function requestIndustry(params){
     notify('Запрос отправлен ведущему.');
   }
 }
+/** Returns only after the GM commits the item exchange. Required by the craft animation. */
+export async function requestCraftNow(params){
+  const gm=gmLeader();if(!gm)throw Error('Для изготовления нужен активный GM.');
+  const request={...params,kind:'genesis-industry-request',action:'craft-now',id:uid(),userId:game.user.id};
+  if(gm.id===game.user.id)return await withWorldLock(()=>commit(request));
+  return await new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>{craftAwaiters.delete(request.id);reject(Error('Сервер не подтвердил изготовление за 60 секунд. Проверьте инвентарь.'));},60000);
+    craftAwaiters.set(request.id,{resolve,reject,timeout,userId:game.user.id});
+    try{game.socket.emit(`system.${SYSTEM}`,request);}catch(error){clearTimeout(timeout);craftAwaiters.delete(request.id);reject(error);}
+  });
+}
 export function initializeIndustry(){
   game.socket.on(`system.${SYSTEM}`,(payload,senderId)=>{
     if(!payload||typeof payload!=='object')return;
     if(payload.kind==='genesis-industry-result'){
+      const waiter=craftAwaiters.get(payload.id);
+      if(waiter){
+        if(waiter.userId!==payload.userId)return;
+        clearTimeout(waiter.timeout);craftAwaiters.delete(payload.id);
+        if(payload.ok)waiter.resolve(String(payload.message||'Изготовлено.'));
+        else waiter.reject(Error(String(payload.message||'Ошибка крафта.')));
+        return;
+      }
       if(payload.userId!==game.user.id||!outstanding.has(payload.id))return;
       const at=outstanding.get(payload.id);outstanding.delete(payload.id);
       if(Date.now()-at<TIMEOUT)notify(String(payload.message||'Готово'),!payload.ok);

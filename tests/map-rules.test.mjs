@@ -10,7 +10,7 @@ test('each of 14 buildings has a footprint and a shipped tile asset',()=>{
   for(const [code,dimensions] of Object.entries(BUILDING_FOOTPRINTS)){
     assert.equal(dimensions.length,2);
     assert.ok(dimensions.every(n=>Number.isSafeInteger(n)&&n>0));
-    assert.ok(tileAsset(code,true).endsWith(code==='shelter'?'shelter-roof.png':code==='bench'?'bench-top.png':`${code}.svg`));
+    assert.ok(tileAsset(code,true).endsWith(`${code}.png`));
     assert.ok(tileAsset(code,false).endsWith('construction-site.svg'));
   }
 });

@@ -149,32 +149,9 @@ export async function openStationCraft(colonyId,placementId){
     const p=sourceForWorkstation(colony,placementId);
     const scene=game.scenes.get(p.sceneId);
     if(placementHealth(p,scene,scene?.tiles?.get?.(p.tileId))!=='ok')throw Error('Тайл станка повреждён.');
-    const recipes=RECIPES.filter(r=>r.station===p.buildingId);
-    if(!recipes.length)return ui.notifications.info('У этого станка пока нет рецептов.');
-    const enabled=new Set(colony.system.science.unlocked||[]);
-    const options=recipes.map(r=>`<option value="${escape(r.id)}" ${enabled.has(r.techId)?'':'disabled'}>${escape(r.name)}${enabled.has(r.techId)?'':' · требуется исследование'}</option>`).join('');
-    const online=placementOperational(colony,p);
-    const warehouses=(colony.system.industry?.placements||[]).filter(w=>warehouseNearStation(p,w,game.scenes));
-    const storageOptions=`<option value="">Общий склад колонии</option>`+warehouses.map(w=>
-      `<option value="${escape(w.id)}">Локальный склад · ${escape(game.scenes.get(w.sceneId)?.name||'Сцена')} (${escape(w.id.slice(0,8))})</option>`).join('');
-    const data=await foundry.applications.api.DialogV2.prompt({
-      window:{title:`Крафт · ${BUILDING_BY_ID[p.buildingId]?.name||p.buildingId}`},
-      content:`<div class="genesis-dialog"><p>${online?'Станок доступен для производства.':'⚠ Станок обесточен или не получает нужные коммуникации. Требуется подключение наружного помещения к электросети.'}</p>
-      <label>Рецепт<select name="recipe">${options}</select></label>
-      <label>Количество партий<input type="number" name="amount" value="1" min="1" max="10" step="1" required></label>
-      <label>Источник ресурсов<select name="sourcePlacementId">${storageOptions}</select></label>
-      <p>Если выбран локальный склад, готовый предмет также отправится в него. Продукция выдаётся после завершения очереди.</p></div>`,
-      ok:{label:'Создать заказ',callback:(_event,button)=>({
-        recipe:String(button.form.elements.namedItem('recipe')?.value||''),
-        amount:Number(button.form.elements.namedItem('amount')?.value),
-        sourcePlacementId:String(button.form.elements.namedItem('sourcePlacementId')?.value||'')})}
-    });
-    if(!data)return;
-    if(!online)throw Error('Станок не работает: проверьте инженерные сети и электроснабжение помещения.');
-    if(!recipes.some(r=>r.id===data.recipe&&enabled.has(r.techId)))throw Error('Этот рецепт пока недоступен.');
-    await requestIndustry({action:'start-recipe',colonyId,subject:data.recipe,amount:data.amount,
-      stationPlacementId:placementId,sourcePlacementId:data.sourcePlacementId});
-  }catch(error){ui.notifications.warn(error.message||'Не удалось открыть крафт.');}
+    const {showCraftBoard}=await import('./crafting-board.mjs');
+    showCraftBoard(colony,p);
+  }catch(error){ui.notifications.warn(error.message||'Не удалось открыть стол производства.');}
 }
 /** Inspect one physical warehouse by clicking its tile on the Scene. */
 export async function openLocalWarehouse(colonyId,placementId){
@@ -251,9 +228,9 @@ function buildCanvasInteractions(){
       const requiresPower=isCraftStation(placement.buildingId)&&config?.power&&!config?.optionalPower;
       const offline=requiresPower&&!placementOperational(colony,placement,powerSnapshot);
       el.textContent=isInteriorBuilding(placement.buildingId)?'⌂ Войти':isLocalWarehouse(placement)?'▣ Склад':
-        offline?'⚡ Нет питания':'⚒ Крафт';
+        offline?'⚡ Нет питания':`⚒ Крафт · ${Number(placement.tier)||1} ур.`;
       el.title=(BUILDING_BY_ID[placement.buildingId]?.name||placement.buildingId)+
-        (offline?' — не подключено электроснабжение':'');
+        ` · уровень ${Number(placement.tier)||1}`+(offline?' — не подключено электроснабжение':'');
       el.addEventListener('click',event=>{event.stopPropagation();void action();},input);
       document.body.append(el);buttons.push(el);
       const tile=canvas.tiles?.placeables?.find(t=>t.document?.id===placement.tileId);

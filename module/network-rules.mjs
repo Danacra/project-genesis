@@ -202,7 +202,7 @@ export function asNetworkTiles(type,route,{networkId,colonyId,grid,gmFree=false}
  */
 export function simulateNetworks(placements,links,{linkStatuses={},priorities={},interiorLoads={}}={}){
   const active=list(placements).filter(p=>p.status==='finished'&&DEVICES[p.buildingId]);
-  const nodes=new Map(active.map(p=>[p.id,{id:p.id,buildingId:p.buildingId,sceneId:p.sceneId,
+  const nodes=new Map(active.map(p=>[p.id,{id:p.id,buildingId:p.buildingId,sceneId:p.sceneId,tier:Number(p.tier)||1,
     powered:false,watered:false,powerNeed:(DEVICES[p.buildingId].power||0)+(interiorLoads[p.id]||0),
     waterNeed:DEVICES[p.buildingId].water||0,operational:false}]));
   const valid=list(links).filter(l=>NETWORK_TYPES[l.type]&&nodes.has(l.fromId)&&nodes.has(l.toId)&&
@@ -219,8 +219,8 @@ export function simulateNetworks(placements,links,{linkStatuses={},priorities={}
       while(stack.length){const id=stack.pop();component.push(nodes.get(id));for(const target of adj.get(id))if(!visited.has(target)){visited.add(target);stack.push(target);}}
       const devices=component.map(n=>({node:n,config:DEVICES[n.buildingId]}));
       // A water station requires an actually powered electrical connection.
-      const supply=devices.reduce((sum,{node,config})=>sum+(type==='power'?config.powerOut||0:
-        node.powered?config.waterOut||0:0),0);
+      const supply=devices.reduce((sum,{node,config})=>sum+(type==='power'?(config.powerOut||0)*(1+0.5*Math.max(0,Math.min(3,Number(node.tier)||1)-1)):
+        node.powered?(config.waterOut||0)*(1+0.5*Math.max(0,Math.min(3,Number(node.tier)||1)-1)):0),0);
       const demand=devices.reduce((sum,{node,config})=>sum+(type==='power'?node.powerNeed:config.water||0),0);
       let available=supply,served=0;
       const sorted=devices.filter(({node,config})=>(type==='power'?node.powerNeed:config.water)>0)

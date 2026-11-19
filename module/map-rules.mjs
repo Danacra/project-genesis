@@ -11,10 +11,10 @@ export const BUILDING_FOOTPRINTS = Object.freeze({
 });
 const SYSTEM='project-genesis';
 export const BASE_TILE = `systems/${SYSTEM}/assets/buildings/`;
-export const tileAsset=(id,finished=false)=>
-  finished&&id==='shelter'?`${BASE_TILE}shelter-roof.png`:
-  finished&&id==='bench'?`${BASE_TILE}bench-top.png`:
-  `${BASE_TILE}${finished?id:'construction-site'}.svg`;
+// v1.4 artwork: every finished building has a detailed, old-style UI tile.
+// All images use the same source id and preserve the grid footprint in cells.
+export const tileAsset=(id,finished=false,tier=1)=>
+  `${BASE_TILE}${finished&&Object.hasOwn(BUILDING_FOOTPRINTS,id)?id+(Number(tier)>1?'-t'+Math.min(3,Number(tier)):'')+'.png':'construction-site.svg'}`;
 export const cellsFor=(id)=>BUILDING_FOOTPRINTS[id]||null;
 export function sceneGeometry(scene){
   const grid=Number(scene?.grid?.size);

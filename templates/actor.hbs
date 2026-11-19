@@ -110,8 +110,15 @@
           {{#if isGM}}<button type="button" data-genesis-action="grant" title="Начисление очков ведущим">+ Начислить ОИ</button>{{/if}}
         </div>
       </div>
-      <div class="genesis-field-entry"><div><strong>Полевые наблюдения</strong><span>Исследования первого этапа: {{research.subDone}} / {{research.subTotal}} завершено</span></div>
-        <button type="button" class="genesis-primary" data-genesis-open-subtree="survey">Открыть программу →</button></div>
+      <div class="genesis-programme-overview" aria-label="Научные программы первого этапа">
+        {{#each research.programmes}}
+        <article class="genesis-field-entry">
+          <div><strong>{{name}}</strong><span>{{done}} / {{total}} мини-исследований · {{#if complete}}Завершено{{else}}В процессе{{/if}}</span></div>
+          <div class="genesis-programme-track"><span style="width:{{percent}}%"></span></div>
+          <button type="button" class="genesis-primary" data-genesis-open-subtree="{{id}}">{{#if complete}}Просмотреть{{else}}Открыть программу{{/if}} →</button>
+        </article>
+        {{/each}}
+      </div>
       <div data-genesis-research-main>
       <div class="genesis-tech-toolbar">
         <div class="genesis-tech-filters"><button type="button" data-genesis-tech-filter="all" class="active">Все направления</button>
@@ -145,10 +152,10 @@
           <section data-genesis-tech-detail="{{id}}" hidden>
             <span class="genesis-kicker">{{branchLabel}} · ЭПОХА {{epochDisplay}}</span><h3>{{name}}</h3>
             <p class="genesis-muted">{{description}}</p>
-            {{#if isGroup}}<div class="genesis-survey-inspector"><strong>Программа состоит из 10 исследований</strong>
-              <p>Все десять мини-исследований обязательны для открытия «Полевых наблюдений» и перехода к укрытию, каменным инструментам и анализу воды.</p>
-              <p><strong>{{progress}} / 10</strong> открыто</p>
-              <button type="button" class="genesis-primary" data-genesis-open-subtree="survey">Перейти к мини-исследованиям →</button>
+            {{#if isGroup}}<div class="genesis-survey-inspector"><strong>Составная научная программа</strong>
+              <p>Для открытия «{{name}}» необходимо завершить все 10 внутренних исследований. Каждое требует собственных очков исследований и соответствующих условий.</p>
+              <p><strong>{{progress}} / {{required}}</strong> открыто</p>
+              <button type="button" class="genesis-primary" data-genesis-open-subtree="{{id}}">Перейти к мини-исследованиям →</button>
               </div>{{/if}}
             {{#if unlocked}}
               <p class="genesis-tech-done">✓ Технология изучена колонией</p>
@@ -183,18 +190,19 @@
       </div>
       </div><!-- /data-genesis-research-main -->
       <div class="genesis-research-subtree" data-genesis-research-subtree hidden>
-        <div class="genesis-subtree-header">
-          <button type="button" data-genesis-back-to-tree>← Все технологии</button>
-          <div><span class="genesis-kicker">ПОЛЕВОЙ ЭТАП / ВНУТРЕННЯЯ ПРОГРАММА</span>
-            <h3>Полевые наблюдения</h3>
-            <p class="genesis-muted">Исследуйте десять направлений в любом доступном порядке. Последнее открытие автоматически завершит программу.</p></div>
-          <div class="genesis-subtree-counter"><strong>{{research.subDone}} / {{research.subTotal}}</strong><small>ИЗУЧЕНО</small></div>
-        </div>
-        <div class="genesis-subtree-progress"><span style="width:{{research.subDone}}0%"></span></div>
-        {{#if research.subComplete}}<p class="genesis-tech-done">✓ Полевые наблюдения завершены. Новые колонии теперь могут развивать остальные технологии полевого этапа.</p>{{/if}}
-        <div class="genesis-subtree-layout">
-          <div class="genesis-subtree-phases" role="group" aria-label="Этапы полевых исследований">
-            {{#each research.subPhases}}
+        {{#each research.programmes}}
+        <div data-genesis-research-program="{{id}}" hidden>
+          <div class="genesis-subtree-header">
+            <button type="button" data-genesis-back-to-tree>← Все технологии</button>
+            <div><span class="genesis-kicker">PROJECT GENESIS / НАУЧНАЯ ПРОГРАММА</span>
+              <h3>{{name}}</h3><p class="genesis-muted">{{description}} Для завершения исследуйте все десять направлений.</p></div>
+            <div class="genesis-subtree-counter"><strong>{{done}} / {{total}}</strong><small>ИЗУЧЕНО</small></div>
+          </div>
+          <div class="genesis-subtree-progress"><span style="width:{{percent}}%"></span></div>
+          {{#if complete}}<p class="genesis-tech-done">✓ Программа завершена, её чертежи открыты.</p>{{/if}}
+          <div class="genesis-subtree-layout">
+            <div class="genesis-subtree-phases" role="group" aria-label="Мини-исследования программы">
+              {{#each phases}}
               <section class="genesis-subtree-phase"><header><span>{{name}}</span><small>{{description}}</small></header>
                 {{#each nodes}}
                   <button type="button" class="genesis-subtech-card {{#if unlocked}}is-unlocked{{else}}{{#unless prerequisitesReady}}is-locked{{/unless}}{{/if}}" data-genesis-subtech-card="{{id}}" aria-label="{{name}}">
@@ -204,31 +212,35 @@
                   </button>
                 {{/each}}
               </section>
-            {{/each}}
-          </div>
-          <aside class="genesis-subtree-inspector" aria-label="Детали мини-исследования">
-          {{#each research.subDetails}}
-            <section data-genesis-subtech-detail="{{id}}" hidden>
-              <span class="genesis-kicker">{{branchLabel}} · МИНИ-ИССЛЕДОВАНИЕ</span>
-              <h3>{{name}}</h3>
-              <p>{{description}}</p>
-              <h4>Результат изучения</h4><p class="genesis-subtech-result">{{result}}</p>
-              {{#if unlocked}}<p class="genesis-tech-done">✓ Исследование завершено</p>
-              {{else}}
-                <div class="genesis-tech-invest"><strong>{{progress}} / {{rp}} ОИ</strong><progress max="{{rp}}" value="{{progress}}"></progress></div>
-                {{#if parentsNames.length}}<h4>Необходимые открытия</h4><p>{{#each parentsNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
-                {{#if missingParentNames.length}}<p class="genesis-tech-alert">Сначала изучите: {{#each missingParentNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
-                {{#if ../research.canResearch}}
-                  {{#if canWork}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
-                  {{#if remaining}}<button type="button" data-genesis-action="invest" data-tech-id="{{id}}" {{#unless canInvest}}disabled title="{{investBlockedReason}}"{{/unless}}>Вложить очки</button>{{/if}}
-                  {{#if investBlockedReason}}<p class="genesis-tech-alert">{{investBlockedReason}}</p>{{/if}}
-                  {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить исследование</button>{{/if}}
+              {{/each}}
+            </div>
+            <aside class="genesis-subtree-inspector" aria-label="Детали мини-исследования">
+              {{#each details}}
+              <section data-genesis-subtech-detail="{{id}}" hidden>
+                <span class="genesis-kicker">{{branchLabel}} · МИНИ-ИССЛЕДОВАНИЕ</span>
+                <h3>{{name}}</h3><p>{{description}}</p>
+                <h4>Результат изучения</h4><p class="genesis-subtech-result">{{result}}</p>
+                {{#if unlocked}}<p class="genesis-tech-done">✓ Исследование завершено</p>
+                {{else}}
+                  <div class="genesis-tech-invest"><strong>{{progress}} / {{rp}} ОИ</strong><progress max="{{rp}}" value="{{progress}}"></progress></div>
+                  {{#if parentsNames.length}}<h4>Необходимые открытия</h4><p>{{#each parentsNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+                  {{#if missingParentNames.length}}<p class="genesis-tech-alert">Сначала изучите: {{#each missingParentNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+                  {{#if missingFacilityNames.length}}<p class="genesis-tech-alert">Требуется инфраструктура: {{#each missingFacilityNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+                  {{#unless powerReady}}<p class="genesis-tech-alert">Необходимая инфраструктура обесточена.</p>{{/unless}}
+                  {{#if materials.length}}<h4>Материалы для завершения</h4><ul class="genesis-tech-materials">{{#each materials}}<li class="{{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></li>{{/each}}</ul>{{/if}}
+                  {{#if ../../research.canResearch}}
+                    {{#if canWork}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
+                    {{#if remaining}}<button type="button" data-genesis-action="invest" data-tech-id="{{id}}" {{#unless canInvest}}disabled title="{{investBlockedReason}}"{{/unless}}>Вложить очки</button>{{/if}}
+                    {{#if investBlockedReason}}<p class="genesis-tech-alert">{{investBlockedReason}}</p>{{/if}}
+                    {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить исследование</button>{{/if}}
+                  {{/if}}
                 {{/if}}
-              {{/if}}
-            </section>
-          {{/each}}
-          </aside>
+              </section>
+              {{/each}}
+            </aside>
+          </div>
         </div>
+        {{/each}}
       </div>
       <div class="genesis-panel"><h3>Научная инфраструктура</h3>
         <p class="genesis-muted">В v0.5 лаборатории и мастерские можно строить во вкладке «Строительство». Ведущий также может вручную отмечать объекты, уже существовавшие в кампании до обновления.</p>
@@ -268,7 +280,7 @@
           {{#if canCancel}}<button type="button" data-genesis-action="industry" data-industry-action="cancel" data-queue="jobs" data-job-id="{{id}}">Отменить</button>{{/if}}</article>
       {{else}}<p class="genesis-muted">Производственных заданий пока нет.</p>{{/each}}</div>
     </div>
-    <div class="genesis-panel"><div class="genesis-toolbar"><div><h3>Библиотека рецептов</h3><p class="genesis-muted">27 рецептов из древа технологий · стоимость указана на одну партию</p></div></div>
+    <div class="genesis-panel"><div class="genesis-toolbar"><div><h3>Библиотека рецептов</h3><p class="genesis-muted">Рецепты, открываемые исследованиями · стоимость указана на одну партию</p></div></div>
       <div class="genesis-production-grid">{{#each industry.craft}}
       {{#if hiddenForPlayer}}
       <article class="genesis-product-card genesis-discovery-secret" aria-label="Неизвестный рецепт"><div class="genesis-secret-icon" aria-hidden="true">?</div><h3>???</h3><p>Чертёж ещё не открыт</p></article>
@@ -308,6 +320,10 @@
           {{#if canRepair}}<button type="button" class="genesis-map-repair" data-genesis-action="repair-map" data-placement-id="{{id}}">Восстановить тайл (GM)</button>{{/if}}
           {{#if isFinished}}{{#if isRoom}}<button type="button" class="genesis-primary" data-genesis-action="enter-room" data-placement-id="{{id}}">Войти внутрь</button>{{/if}}
             {{#if isStation}}<button type="button" class="genesis-primary" data-genesis-action="station-craft" data-placement-id="{{id}}">Крафт</button>{{/if}}{{/if}}
+          {{#if nextTier}}<span class="genesis-tier-badge" title="Уровень постройки">Уровень {{tier}} / 3 {{tierMark}}</span>
+          {{#if canUpgrade}}<button type="button" data-genesis-action="industry" data-industry-action="upgrade-building" data-placement-id="{{id}}" title="{{upgradeCost}}">Улучшить до {{nextTier}} · {{upgradeCost}}</button>{{/if}}
+          {{#if canGMUpgrade}}<button type="button" data-genesis-action="industry" data-industry-action="upgrade-building" data-gm-free="true" data-placement-id="{{id}}">Улучшить до {{nextTier}} (GM бесплатно)</button>{{/if}}
+          {{else}}<span class="genesis-tier-badge">Уровень 3 / 3 ◆◆◆</span>{{/if}}
           {{#if canDismantle}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="salvage" data-placement-id="{{id}}">Разобрать (50%)</button>{{/if}}
           {{#if canErase}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="erase" data-placement-id="{{id}}" class="genesis-danger">Удалить (GM)</button>{{/if}}
           {{#if canCancelSite}}<button type="button" data-genesis-action="industry" data-industry-action="cancel" data-queue="construction" data-job-id="{{jobId}}" class="genesis-danger">Отменить стройплощадку (GM)</button>{{/if}}

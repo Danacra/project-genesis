@@ -176,7 +176,8 @@ export function networkContext(actor,user,networkSnapshot=null){
       node.powerNeed&&!node.powered?'Нет питания':'Нет водоснабжения'):'Тайл требует проверки';
     return {...p,name,sceneName:game.scenes.get(p.sceneId)?.name||'Неизвестная сцена',
       powerNeed:DEVICES[p.buildingId]?.power||0,waterNeed:DEVICES[p.buildingId]?.water||0,
-      powerOut:DEVICES[p.buildingId]?.powerOut||0,waterOut:DEVICES[p.buildingId]?.waterOut||0,
+      powerOut:(DEVICES[p.buildingId]?.powerOut||0)*(1+.5*(Math.min(3,Number(p.tier)||1)-1)),
+      waterOut:(DEVICES[p.buildingId]?.waterOut||0)*(1+.5*(Math.min(3,Number(p.tier)||1)-1)),
       status,priority,priorityOptions:Array.from({length:10},(_,n)=>({value:n,label:`${n}${n===0?' · высший':n===9?' · низший':''}`,selected:n===priority})),
       powered:!!node?.powered,watered:!!node?.watered,working:!!node?.operational};
   });

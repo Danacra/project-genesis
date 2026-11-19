@@ -14,7 +14,7 @@ test('all 10 substudies are distinct and grouped into four stages',()=>{
  assert.deepEqual(new Set(FIELD_STUDIES.map(t=>t.id)).size,10);
  assert.ok(FIELD_STUDIES.every(t=>t.group==='survey'&&t.t===0&&t.rp>=1&&t.rp<=4));
  assert.ok(FIELD_STUDIES.every(t=>FIELD_PHASES.some(p=>p.id===t.phase)));
- assert.equal(TECHNOLOGIES.length,25);
+ assert.equal(TECHNOLOGIES.length,30);
 });
 test('the composite parent is not fundable or directly completable',()=>{
  assert.equal(group().progress,0);
@@ -94,8 +94,8 @@ test('research template has nested screen, ten detail templates, back control an
  assert.match(html,/data-genesis-subtech-card/);
  assert.match(html,/data-genesis-subtech-detail/);
  assert.match(html,/data-genesis-back-to-tree/);
- assert.match(html,/research\.subPhases/);
- assert.match(html,/research\.subDetails/);
+ assert.match(html,/research\.programmes/);
+ assert.match(html,/data-genesis-research-program/);
  assert.match(js,/dataset\.genesisSubtechCard/);
  assert.match(js,/this\._subtreeOpen=true/);
  assert.match(js,/this\._subtreeOpen=false/);

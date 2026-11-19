@@ -37,11 +37,11 @@ test('colony includes research fields but retains legacy science points/tier',()
 test('ready registers nine world socket handlers and exposes crew api',()=>{
   hooks.ready();
   assert.equal(listeners.length,9);
-  assert.equal(game.projectGenesis.recipes.length,27);
+  assert.equal(game.projectGenesis.recipes.length,51);
   assert.equal(typeof game.projectGenesis.requestCrew,'function');
   assert.equal(game.projectGenesis.buildings.length,14);
   assert.equal(typeof game.projectGenesis.requestIndustry,'function');
-  assert.equal(game.projectGenesis.technologies.length,25);
+  assert.equal(game.projectGenesis.technologies.length,30);
   assert.equal(typeof game.projectGenesis.requestResearch,'function');
   assert.equal(typeof game.projectGenesis.advanceDay,'function');
   assert.equal(typeof game.projectGenesis.requestNetwork,'function');

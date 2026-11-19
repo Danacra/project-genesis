@@ -62,8 +62,10 @@ export function capacity(actor) {
   if (actor.type === 'colony') {
     const stores=(actor.system?.industry?.buildings||[]).filter(b=>b.id==='storehouse')
       .reduce((sum,b)=>sum+Math.max(0,Math.trunc(n(b.count))),0);
-    return {mass:Math.max(0,n(actor.system?.capacity?.mass))+stores*750,
-      volume:Math.max(0,n(actor.system?.capacity?.volume))+stores*1500};
+    const upgraded=(actor.system?.industry?.placements||[]).filter(p=>p.status==='finished'&&p.buildingId==='storehouse')
+      .reduce((sum,p)=>sum+([0,1,1.7,2.5][Math.min(3,Math.max(1,Number(p.tier)||1))]-1),0);
+    return {mass:Math.max(0,n(actor.system?.capacity?.mass))+(stores+upgraded)*750,
+      volume:Math.max(0,n(actor.system?.capacity?.volume))+(stores+upgraded)*1500};
   }
   const strength = clamp(Math.trunc(n(actor.system?.abilities?.strength ?? 2)), 1, 10);
   const cart=[...(actor.items||[])].some(i=>i.type==='tool'&&i.system?.resourceCode==='handcart'&&Number(i.system?.quantity)>0);

@@ -11,9 +11,10 @@ export function hasShelter(colony){return Boolean(colony?.system.industry?.build
 export function restOutcome(vitals,kind,shelter){
   if(!['field','shelter'].includes(kind))throw Error('Неизвестный вид отдыха.');
   if(kind==='shelter'&&!shelter)throw Error('Сначала постройте жилой модуль.');
-  const effect=kind==='shelter'?40:22;
+  const tier=typeof shelter==='number'?Math.max(1,Math.min(3,shelter)):1;
+  const effect=kind==='shelter'?40+10*(tier-1):22;
   return {...vitals,fatigue:clamp(Number(vitals.fatigue||0)-effect),
-    health:clamp(Number(vitals.health||0)+(kind==='shelter'?5:0))};
+    health:clamp(Number(vitals.health||0)+(kind==='shelter'?5+5*(tier-1):0))};
 }
 export function restContext(actor,colony,worldDay){
   if(actor.type!=='survivor')return {available:false};
@@ -31,7 +32,7 @@ async function commit(request){
   if(colony?.system.crew?.jobs?.some(j=>j.actorId===actor.id))throw Error('Персонаж сейчас выполняет задание. Сначала завершите его.');
   const today=day();
   if(Number(actor.system.rest?.lastDay||0)===today)throw Error('Этот выживший уже отдыхал сегодня.');
-  const next=restOutcome(actor.system.survival,request.restKind,hasShelter(colony));
+  const next=restOutcome(actor.system.survival,request.restKind,hasShelter(colony)?Math.max(1,...(colony.system.industry?.placements||[]).filter(p=>p.buildingId==='shelter'&&p.status==='finished').map(p=>Number(p.tier)||1)):false);
   await actor.update({'system.survival':next,'system.rest.lastDay':today});
   return `${actor.name} восстановил силы (${request.restKind==='shelter'?'жилой модуль':'полевой лагерь'}).`;
 }

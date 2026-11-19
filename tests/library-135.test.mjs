@@ -25,11 +25,11 @@ test('player handbook is readable, has no GM-only chapters; GM gets additional t
  assert.ok(player.chapters.every(c=>c.sections.length>0&&c.sections.every(s=>s.title&&(s.text||s.steps?.length))));
 });
 test('artwork is packaged and finished buildings have dedicated PNGs',()=>{
- assert.match(tileAsset('shelter',true),/shelter-roof\.png$/);
- assert.match(tileAsset('bench',true),/bench-top\.png$/);
+ assert.match(tileAsset('shelter',true),/shelter\.png$/);
+ assert.match(tileAsset('bench',true),/bench\.png$/);
  assert.match(tileAsset('bench',false),/construction-site\.svg$/);
- assert.ok(existsSync(new URL('../assets/buildings/bench-top.png',import.meta.url)));
- assert.ok(existsSync(new URL('../assets/buildings/shelter-roof.png',import.meta.url)));
+ assert.ok(existsSync(new URL('../assets/buildings/bench.png',import.meta.url)));
+ assert.ok(existsSync(new URL('../assets/buildings/shelter.png',import.meta.url)));
 });
 function worldForBench({img='systems/project-genesis/assets/buildings/bench.svg',isGM=true,foreign=false}={}){
  const tile={id:'tile1',texture:{src:img},flags:{'project-genesis':{colonyId:foreign?'no':'col',placementId:'place1',buildingId:'bench',status:'finished'}}};
@@ -38,7 +38,7 @@ function worldForBench({img='systems/project-genesis/assets/buildings/bench.svg'
  return {scene,tile,world:{user:{isGM},actors:{filter:f=>[colony].filter(f)},scenes:{get:id=>id==='scene1'?scene:null}}};
 }
 test('default benches migrate only once; custom art never replaced',async()=>{
- const x=worldForBench();assert.equal(await upgradeDefaultWorkbenchTiles(x.world),1);assert.match(x.tile.texture.src,/bench-top\.png$/);
+ const x=worldForBench();assert.equal(await upgradeDefaultWorkbenchTiles(x.world),1);assert.match(x.tile.texture.src,/bench\.png$/);
  assert.equal(await upgradeDefaultWorkbenchTiles(x.world),0);
  for(const opts of [{img:'worlds/example/custom.png'},{foreign:true},{isGM:false}]){
   const y=worldForBench(opts);assert.equal(await upgradeDefaultWorkbenchTiles(y.world),0);assert.equal(y.scene.updates.length,0);

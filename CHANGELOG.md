@@ -1,3 +1,51 @@
+## 1.5.1 — Metals & Item Icons
+
+- Добавлены новые типы руды на карту: железная, оловянная, алюминиевая и титановая.
+- Добавлены новые цепочки выплавки и сплавов: железные, оловянные, алюминиевые, титановые, бронзовые и стальные слитки.
+- Добавлены производственные рецепты проводки, железной фурнитуры, стальных пластин и титановой рамы.
+- Для новых руд, слитков и ключевых материалов добавлены отдельные иконки; готовая продукция теперь получает подходящую иконку автоматически.
+- Старые сохранения остаются совместимыми; уже существующие предметы и колонии не требуют миграции мира.
+
+## 1.4.0 — Early Research & Workshop Art
+
+- Восемь составных научных программ, 80 вложенных исследований (10 в каждой) с зависимостями, описаниями и результатами.
+- Прохождение группы открывает главную технологию без второго списания ОИ. Материалы старой технологии учтены в финальном исследовании.
+- Старые сохранения остаются совместимыми: уже исследованная технология делает все свои дочерние исследования пройденными.
+- Обновлены все 14 тайлов зданий: игровые иллюстрации в прежней рамочной стилистике, подписи и правильные пропорции клеток.
+- При первом входе GM стандартные тайлы обновляются без изменения пользовательских текстур.
+
+## v1.3.5 — Expedition Library & Player-Supplied Building Art (2026-11-19)
+- In-game «Библиотека» available in actor and colony sheets, searchable player handbook (13 chapters) and GM-only articles (4 chapters).
+- Contextual «?» links in gameplay pages open relevant handbook chapters without leaving the sheet.
+- Shipped the user's exact transparent roof and workbench PNG files; finished shelter and bench tiles use the new art.
+- Safely upgrades untouched standard finished bench tiles when a GM opens the world; never replaces custom textures.
+- No world schema changes, actor/item IDs or economic mechanics changed. Manual Foundry v13 UI testing is still needed.
+
+## v1.3.4 — GM Utilities & Residential Roof
+- GM-only instant engineering network creation for both electrical cables and water pipes, with auto-routing or manual drawing. Resources are not debited; geometry, duplicate, capacity, authorization and rollback rules are retained.
+- Persistent gmFree flag on each link and segment, with GM markers in network diagnostics. User-created routes are unaffected and never become free.
+- Exterior shelter roof replaced with the user-provided transparent top-down texture; interior remains unchanged.
+- Previous default shelter tiles get an idempotent, GM-authorized art update. Manually customized textures remain untouched.
+- Foundry in-client validation is still needed; preserve a world backup before installing.
+
+## 1.3.3 — GM Construction & Safe Cleanup
+
+- GM can place several identical buildings for free, without the normal per-type maximum; occupancy and map restrictions remain.
+- GM erase is available for missing/moved/foreign building tiles and deleted scenes; foreign tiles are never deleted.
+- Generated interior ceiling light no longer blocks deletion of an otherwise empty room.
+- GM-created free buildings are marked and cannot be dismantled for a materials refund.
+- Buildings with live networks, cargo or jobs remain protected; occupied rooms must be vacated.
+
+## v1.3.2 — UI, Discovery Fog & GM Building (2026-11-19)
+- Fixed canvas hit testing for resource deposits and buildings; added square-grid validation and clearer placement instructions.
+- GM-only instant placement of finished buildings without research, material costs, or construction delay; validates scene, space and building limits, and rolls back an orphaned tile on failure.
+- Locked research eras and mini-study phases are hidden until prior stages are fully unlocked for regular players; GM retains the full tree.
+- Unknown blueprints, recipes and unresearched buildings render as ??? to players instead of revealing names and inputs; previously studied items retain their names.
+- Standardized Cyrillic fonts, card layout, button wrapping and responsive research and construction grids.
+- Added functional descriptions for production stations and a building/blueprint guide; tests for the new conditions.
+- All prior saved actor, colony, mission, building and inventory fields remain unchanged.
+- Not yet visually tested in a live Foundry client.
+
 ## v1.3.1 — Interior Lighting (2026-11-19)
 - Added automatic, power-aware ceiling AmbientLight to residential and workshop interiors.
 - Added room lighting toggle with GM verification, persistent scene flag, network synchronization.
@@ -173,3 +221,12 @@
 
 ## 0.3.0 — Логистика
 - Передача материалов, контейнеры, склад, журнал операций.
+
+## 1.5.0 — Progression & Crafting
+
+- Добавлены уровни I–III для всех 14 типов сооружений с раздельным прогрессом и визуальными маркерами.
+- Улучшенные склады вместительнее, жилые модули усиливают отдых, генераторы и водные станции увеличивают выработку, станки ускоряют очереди.
+- Пять новых направлений науки и 14 новых технологических рецептов: доски, ткань, кирпич, слитки, комплекты и приборы разных уровней.
+- Новый интерактивный рабочий стол станка: перетаскивание материалов, общий склад/локальный склад/личный инвентарь, скрытие закрытых рецептов, анимация после подтверждённого изготовления.
+- GM проверяет и атомарно записывает крафт локального склада; предметные операции используют резервные копии и откат при ошибке.
+- Ранее построенные объекты остаются I уровня; существующий прогресс исследований сохраняется.

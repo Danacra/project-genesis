@@ -204,6 +204,10 @@ async function askIndustry(sheet,el){
   const action=el.dataset.industryAction;
   const details={colonyId:colony.id,action,subject:el.dataset.subject||'',
     jobId:el.dataset.jobId||'',queue:el.dataset.queue||''};
+  if(action==='upgrade-building'){
+    details.placementId=el.dataset.placementId||'';
+    details.gmFree=el.dataset.gmFree==='true';
+  }
   if(action==='start-recipe'){
     let count;
     try{
@@ -374,7 +378,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     form:{submitOnChange:false,closeOnSubmit:false},
     actions:{editImage:this.editImage}};
   static PARTS={body:{template:'systems/project-genesis/templates/actor.hbs'}};
-  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._subtreeOpen=false;this._subtechSelected='survey-landing';this._libraryChapter='start';}
+  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._subtreeOpen=false;this._researchGroup='survey';this._subtechSelected='survey-landing';this._libraryChapter='start';}
   async _prepareContext(options){
     const ctx=await super._prepareContext(options),actor=this.document;
     const cap=capacity(actor),inventory=summarizeInventory(actor.items),load=inventory.load;
@@ -440,6 +444,13 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       const subtree=root.querySelector('[data-genesis-research-subtree]');
       if(main)main.hidden=this._subtreeOpen;
       if(subtree)subtree.hidden=!this._subtreeOpen;
+      const selectedProgramme=root.querySelector(`[data-genesis-research-program="${this._researchGroup}"]`);
+      root.querySelectorAll('[data-genesis-research-program]').forEach(el=>{
+        el.hidden=el!==selectedProgramme;
+      });
+      if(selectedProgramme&&!selectedProgramme.querySelector(`[data-genesis-subtech-card="${this._subtechSelected}"]`)){
+        this._subtechSelected=selectedProgramme.querySelector('[data-genesis-subtech-card]')?.dataset.genesisSubtechCard||'';
+      }
       root.querySelectorAll('[data-genesis-subtech-card]').forEach(c=>{
         c.classList.toggle('is-selected',c.dataset.genesisSubtechCard===this._subtechSelected);
         c.setAttribute('aria-pressed',String(c.dataset.genesisSubtechCard===this._subtechSelected));
@@ -539,11 +550,16 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       const techCard=event.target.closest?.('[data-genesis-tech-card]');
       if(techCard){
         this._techSelected=techCard.dataset.genesisTechCard;
-        if(this._techSelected==='survey')this._subtreeOpen=true;
+        if(root.querySelector(`[data-genesis-research-program="${this._techSelected}"]`)){
+          this._researchGroup=this._techSelected;this._subtreeOpen=true;
+        }
         applyView();return;
       }
-      if(event.target.closest?.('[data-genesis-open-subtree]')){
-        this._techSelected='survey';this._subtreeOpen=true;applyView();return;
+      const programButton=event.target.closest?.('[data-genesis-open-subtree]');
+      if(programButton){
+        this._researchGroup=programButton.dataset.genesisOpenSubtree;
+        this._techSelected=this._researchGroup;
+        this._subtreeOpen=true;applyView();return;
       }
       if(event.target.closest?.('[data-genesis-back-to-tree]')){
         this._subtreeOpen=false;applyView();return;

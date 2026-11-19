@@ -70,3 +70,9 @@ test('0.8.2: repeated schema construction creates independent DataField trees', 
   assert.notStrictEqual(first, second);
   assert.notStrictEqual(first.fields.reserved.element, second.fields.reserved.element);
 });
+
+test('1.3.3: GM instant building origin persists in Colony schema and count supports repeated construction', () => {
+  const schema=models.ColonyData.defineSchema().industry.fields;
+  assert.equal(schema.placements.element.fields.gmInstant instanceof BooleanField,true);
+  assert.ok(schema.buildings.element.fields.count.options.max>=1000);
+});

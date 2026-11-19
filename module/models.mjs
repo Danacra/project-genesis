@@ -43,7 +43,7 @@ export class ColonyData extends TypeDataModel {
       placements:new ArrayField(new SchemaField({
         id:text(''),colonyId:text(''),buildingId:text(''),sceneId:text(''),tileId:text(''),jobId:text(''),interiorSceneId:text(''),
         x:int(0,0,10000000),y:int(0,0,10000000),width:int(1,1,10000000),height:int(1,1,10000000),
-        status:text('construction'),gmInstant:new BooleanField({required:true,nullable:false,initial:false}),createdDay:int(0,0,9999999),by:text('')
+        status:text('construction'),tier:int(1,1,3),gmInstant:new BooleanField({required:true,nullable:false,initial:false}),createdDay:int(0,0,9999999),by:text('')
       }),{initial:()=>[]}),
       history:new ArrayField(new SchemaField({day:int(0,0,9999999),kind:text(''),name:text(''),by:text('')}),{initial:()=>[]}),
       processed:new ArrayField(text(''),{initial:()=>[]})

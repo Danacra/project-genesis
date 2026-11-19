@@ -99,7 +99,7 @@ test('day advancement and completion change tile and activate technology facilit
   await advanceIndustryDay(s.colony);
   await run('complete-building',{jobId:job.id});
   assert.equal(s.scene.tiles.length,1);
-  assert.match(s.scene.tiles[0].texture.src,/bench-top\.png$/);
+  assert.match(s.scene.tiles[0].texture.src,/bench\.png$/);
   assert.equal(s.scene.tiles[0].flags['project-genesis'].status,'finished');
   assert.equal(s.colony.system.industry.placements[0].status,'finished');
   assert.equal(s.colony.system.industry.buildings[0].count,1);
@@ -160,7 +160,7 @@ test('existing v0.5 building can be added to map exactly once at no resource cos
   assert.equal(s.messages.at(-1).ok,true);
   assert.equal(s.colony.system.industry.buildings[0].count,1);
   assert.equal(s.colony.system.industry.placements.length,1);
-  assert.match(s.scene.tiles[0].texture.src,/bench-top\.png$/);
+  assert.match(s.scene.tiles[0].texture.src,/bench\.png$/);
   assert.equal(s.scene.tiles[0].flags['project-genesis'].status,'finished');
   await run('place-existing',{subject:'bench',sceneId:'scene1',x:900,y:200});
   assert.equal(s.messages.at(-1).ok,false);
@@ -392,4 +392,79 @@ test('v1.3.3: deleting one of multiple identical GM buildings preserves the rema
     assert.equal(s.colony.system.industry.buildings.find(x=>x.id==='bench')?.count||0,2-i);
     assert.equal(s.colony.system.science.facilities.includes('bench'),i<2);
   }
+});
+
+// v1.5 integration: real writes to colony, placements, local caches and items.
+import {requestCraftNow} from '../module/industry.mjs';
+function mockTileUpdate(tile){
+ tile.update=async fields=>{
+   for(const [key,value] of Object.entries(fields)){
+     if(key==='texture.src')tile.texture.src=value;
+     if(key==='flags.project-genesis.tier')tile.flags['project-genesis'].tier=value;
+   }
+ };
+}
+test('1.5: GM upgrades one structure to levels 2 and 3 without charging other buildings',async()=>{
+ const s=setup({materials:[],tech:[]});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:400,y:100});
+ const [first,second]=s.colony.system.industry.placements;
+ const firstTile=s.scene.tiles.get(first.tileId);mockTileUpdate(firstTile);
+ await run('upgrade-building',{placementId:first.id,gmFree:true});
+ assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+ assert.equal(s.colony.system.industry.placements[0].tier,2);
+ assert.equal(s.colony.system.industry.placements[1].tier??1,1);
+ assert.match(firstTile.texture.src,/bench-t2\.png$/);
+ await run('upgrade-building',{placementId:first.id,gmFree:true});
+ assert.equal(s.colony.system.industry.placements[0].tier,3);
+ assert.match(firstTile.texture.src,/bench-t3\.png$/);
+ assert.equal(s.items.length,0);
+ await run('upgrade-building',{placementId:first.id,gmFree:true});
+ assert.equal(s.messages.at(-1).ok,false);
+});
+test('1.5: paid upgrade consumes newly processed materials, not player belongings',async()=>{
+ const s=setup({materials:[['plank',5],['stone',5],['cloth',2]],tech:['basic-workshop']});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+ const p=s.colony.system.industry.placements[0];mockTileUpdate(s.scene.tiles.get(p.tileId));
+ await run('upgrade-building',{placementId:p.id,gmFree:false});
+ assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+ assert.equal(s.colony.system.industry.placements[0].tier,2);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='plank').system.quantity,2);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='stone').system.quantity,3);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='cloth').system.quantity,1);
+});
+test('1.5: real instant station crafting uses colony stock, credits output, and rejects unknown recipe',async()=>{
+ const s=setup({materials:[['wood',6]],tech:['wood-processing']});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+ const p=s.colony.system.industry.placements[0];
+ const command={colonyId:'colony',stationPlacementId:p.id,subject:'sawn-planks',sourceKind:'colony',staged:[{code:'wood',count:2}]};
+ const msg=await requestCraftNow(command);
+ assert.match(msg,/Изготовлено/);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='wood').system.quantity,4);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='plank').system.quantity,3);
+ assert.equal(s.colony.system.industry.processed.length,2);
+ await assert.rejects(requestCraftNow({...command,subject:'calibrated-toolkit'}),/нет этого чертежа|требуется улучшение/);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='wood').system.quantity,4);
+});
+test('1.5: local warehouse crafting never debits the general colony stock',async()=>{
+ const s=setup({materials:[['wood',13]],tech:['wood-processing']});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+ await run('gm-instant-build',{subject:'local-store',sceneId:'scene1',x:600,y:100});
+ const station=s.colony.system.industry.placements.find(p=>p.buildingId==='bench');
+ const store=s.colony.system.industry.placements.find(p=>p.buildingId==='local-store');
+ s.colony.system.crew.caches.push({placementId:store.id,stock:[{name:'Древесина',code:'wood',quantity:5,type:'material',unitMass:1,unitVolume:1,quality:0,techTier:0,description:''}]});
+ await requestCraftNow({colonyId:'colony',stationPlacementId:station.id,subject:'sawn-planks',sourceKind:'local',sourcePlacementId:store.id,staged:[{code:'wood',count:2}]});
+ const stock=s.colony.system.crew.caches.find(c=>c.placementId===store.id).stock;
+ assert.equal(stock.find(r=>r.code==='wood').quantity,3);
+ assert.equal(stock.find(r=>r.code==='plank').quantity,3);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='wood').system.quantity,13);
+});
+test('1.5: on failed colony persistence, used crafting materials and outputs are rolled back',async()=>{
+ const s=setup({materials:[['wood',4]],tech:['wood-processing']});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+ const p=s.colony.system.industry.placements[0],original=s.colony.update;
+ let fail=true;s.colony.update=async function(data){if(fail){fail=false;throw Error('mock save failure');}return original.call(this,data);};
+ await assert.rejects(requestCraftNow({colonyId:'colony',stationPlacementId:p.id,subject:'sawn-planks',sourceKind:'colony',staged:[{code:'wood',count:2}]}),/mock save failure/);
+ assert.equal(s.items.find(i=>i.system.resourceCode==='wood').system.quantity,4);
+ assert.equal(s.items.filter(i=>i.system.resourceCode==='plank').length,0);
 });

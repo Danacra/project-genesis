@@ -11,6 +11,10 @@ export const RESOURCE_NODES=Object.freeze({
   sample:{name:'Исследовательские образцы',code:'sample',mass:.25,volume:.4,limit:220,days:1,skill:'exploration'},
   organic:{name:'Биологические образцы',code:'organic',mass:.5,volume:1,limit:320,days:1,skill:'survival'},
   copper:{name:'Медная руда',code:'copper',mass:2,volume:1.5,limit:220,days:2,skill:'engineering'},
+  iron_ore:{name:'Железная руда',code:'iron_ore',mass:2.4,volume:1.8,limit:240,days:2,skill:'engineering'},
+  tin_ore:{name:'Оловянная руда',code:'tin_ore',mass:2.1,volume:1.6,limit:200,days:2,skill:'engineering'},
+  aluminum_ore:{name:'Алюминиевая руда',code:'aluminum_ore',mass:1.7,volume:1.5,limit:180,days:2,skill:'engineering'},
+  titanium_ore:{name:'Титановая руда',code:'titanium_ore',mass:2.8,volume:1.6,limit:150,days:3,skill:'engineering'},
   silicon:{name:'Кремнистая порода',code:'silicon',mass:1.5,volume:1,limit:160,days:2,skill:'engineering'},
   crystal:{name:'Необычные кристаллы',code:'crystal',mass:.8,volume:.8,limit:140,days:3,skill:'exploration'}
 });
@@ -42,7 +46,9 @@ export function journeyDays(scene,from,to,actor,cargo){
   return Math.max(1,Math.ceil(blocks/(18*cart))+Math.floor(cargoMass/(35*cart)));
 }
 export function cacheLimit(placement){
-  return (placement.buildingId==='storehouse'||placement.buildingId==='local-store')?{mass:750,volume:1500}:
+  return (placement.buildingId==='storehouse'||placement.buildingId==='local-store')?
+    {mass:750*([0,1,1.7,2.5][Math.min(3,Math.max(1,Number(placement.tier)||1))]),
+     volume:1500*([0,1,1.7,2.5][Math.min(3,Math.max(1,Number(placement.tier)||1))])}:
     placement.status==='construction'?{mass:220,volume:330}:{mass:200,volume:300};
 }
 export function cacheLoad(stock){return list(stock).reduce((a,r)=>({mass:round(a.mass+r.quantity*r.unitMass),

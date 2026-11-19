@@ -2,6 +2,7 @@
 import { RECIPES, RECIPE_BY_ID, BUILDINGS, BUILDING_BY_ID, resourceName } from './industry-data.mjs';
 import { stockByCode } from './research-rules.mjs';
 import { capacity, fits, summarizeInventory, stackSignature, qty } from './rules.mjs';
+import {iconForCode, iconForRecipe} from './icon-map.mjs';
 const MAX_STACK=999999;
 const list = value => Array.isArray(value)?value:[];
 const set = value=>new Set(list(value));
@@ -19,7 +20,10 @@ export function recipeState(recipeId,colony,batches=1,precomputedStock=null){
   }));
   const unlocked=set(colony.system?.science?.unlocked).has(recipe.techId);
   const facilities=set(colony.system?.science?.facilities);
-  const stationReady=!recipe.station||facilities.has(recipe.station)||hasBuilding(colony,recipe.station);
+  const baseStation=!recipe.station||facilities.has(recipe.station)||hasBuilding(colony,recipe.station);
+  const stationReady=baseStation&&(!recipe.station||Number(recipe.minTier||1)===1||
+    (colony.system?.industry?.placements||[]).some(p=>p.buildingId===recipe.station&&
+      p.status==='finished'&&Number(p.tier||1)>=Number(recipe.minTier||1)));
   return {recipe,unlocked,stationReady,materials,canStart:unlocked&&stationReady&&materials.every(m=>m.ok)};
 }
 export function buildingCount(industry,id){return list(industry?.buildings).find(b=>b.id===id)?.count||0;}
@@ -61,7 +65,7 @@ export function planTake(items,inputs,batches=1){
 }
 export function outputItem(recipe,batches=1){
   const output=recipe.output||recipe;
-  return {name:recipe.name||output.name||'Произведённый предмет',type:output.type||'component',img:'icons/svg/item-bag.svg',
+  return {name:recipe.name||output.name||'Произведённый предмет',type:output.type||'component',img:iconForRecipe(recipe),
     system:{quantity:output.quantity*batches,resourceCode:output.code,unitMass:output.unitMass,
       unitVolume:output.unitVolume,containerId:'',description:recipe.description||''}};
 }

@@ -7,6 +7,7 @@ import {RESOURCE_NODES,crewState,MAX_CREW_JOBS,MAX_NODES,MAX_CARGO,validActor,
   pointOf,nearby,formatCargo,packed,crewJob} from './crew-rules.mjs';
 import {BUILDING_BY_ID} from './industry-data.mjs';
 import {localWarehouseStatus} from './local-storage-rules.mjs';
+import {iconForCode} from './icon-map.mjs';
 const SYSTEM='project-genesis',TIMEOUT=60_000;
 const pending=new Map(),handled=new Set();
 const arr=v=>Array.isArray(v)?v:[];
@@ -153,7 +154,7 @@ async function perform(request){
     const spec=RESOURCE_NODES[n.code],amount=Number(request.amount);
     if(!spec||!Number.isSafeInteger(amount)||amount<1||amount>MAX_CARGO||amount>n.remaining)throw Error('Запаса месторождения недостаточно.');
     nearby(scene,actor,{x:n.x+scene.grid.size/2,y:n.y+scene.grid.size/2});
-    const cargo={code:spec.code,name:spec.name,type:'material',img:`systems/${SYSTEM}/assets/resources/${spec.code}.svg`,
+    const cargo={code:spec.code,name:spec.name,type:'material',img:iconForCode(spec.code),
       quantity:amount,unitMass:spec.mass,unitVolume:spec.volume,quality:0,techTier:0,description:''};
     if(!packed(actor,{type:'material',system:cargo},amount))throw Error('Добыча превысит грузоподъёмность персонажа. Сначала разгрузитесь или изготовьте тележку.');
     const job=jobBase(actor,cargo,laborDays(actor,n.code,amount),{kind:'node',id:n.id},{kind:'actor',id:actor.id},user,scene.id);

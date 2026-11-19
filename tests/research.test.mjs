@@ -5,14 +5,14 @@ import { validateCatalog, techStatus, planInvestment, planMaterialUse, completio
 function state(extra={}) {return {points:50,tier:0,unlocked:[],facilities:[],projects:[],dailyWork:[],discoveries:[],...extra};}
 function item(id,code,quantity,type='material') {return {id,name:code,type,system:{resourceCode:code,quantity}};}
 test('technology catalog is valid and contains multiple parallel branches',()=>{
- const catalog=validateCatalog();assert.equal(catalog.technologies,25);assert.equal(catalog.subresearch,10);assert.equal(catalog.recipes,27);
+ const catalog=validateCatalog();assert.equal(catalog.technologies,30);assert.equal(catalog.subresearch,10);assert.equal(catalog.recipes,41);
  assert.ok(new Set(TECHNOLOGIES.map(t=>t.branch)).size>=6);
 });
 test('initial technology is accessible and no cost materials',()=>{
  const t=techStatus('survey-landing',state(),[]);
  assert.equal(t.prerequisitesReady,true);assert.equal(t.ready,true);assert.equal(t.progress,0);
  const group=techStatus('survey',state(),[]);
- assert.equal(group.prerequisitesReady,false);assert.equal(group.required,10);
+ assert.equal(group.prerequisitesReady,true);assert.equal(group.required,10);assert.equal(group.unlocked,false);
 });
 test('prerequisite blocks downstream research',()=>{
  const t=techStatus('shelter',state(),[item('w','wood',20)]);
@@ -33,7 +33,7 @@ test('funding progress cannot exceed cost and uses colony points',()=>{
  assert.equal(p2.projects[0].invested,2);
 });
 test('funding forbidden on locked and completed technologies',()=>{
- assert.throws(()=>planInvestment(state(),'shelter',2),/предыдущие/);
+ assert.throws(()=>planInvestment(state(),'shelter',2),/Составная программа/);
  assert.throws(()=>planInvestment(state({unlocked:['survey-landing']}),'survey-landing',1),/уже изучена/);
 });
 test('funding rejects decimals, zero, excessive and over-budget points',()=>{
@@ -45,7 +45,7 @@ test('funding rejects decimals, zero, excessive and over-budget points',()=>{
 test('a fully funded project with missing materials is not completed',()=>{
  const science=state({unlocked:['survey'],projects:[{id:'shelter',invested:5}]});
  const t=techStatus('shelter',science,[item('x','wood',3)]);
- assert.equal(t.percent,100);assert.equal(t.canFinish,false);assert.equal(t.materialReady,false);
+ assert.equal(t.percent,0);assert.equal(t.canFinish,false);assert.equal(t.materialReady,false);
 });
 test('material consumption splits across stacks with exact remainders',()=>{
  const changes=planMaterialUse('shelter',[item('a','wood',1),item('b','wood',4),item('c','fiber',3)]);

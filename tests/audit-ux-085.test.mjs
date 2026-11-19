@@ -8,16 +8,16 @@ test('infrastructure-dependent investment button uses server-compatible check',(
   const colony={id:'c',name:'Base',type:'colony',items:[],system:{science:{unlocked:['survey','shelter','stone-tools'],points:10,facilities:[],projects:[],dailyWork:[],discoveries:[]},industry:{placements:[]}}};
   const user={isGM:true};globalThis.game={actors:{filter:()=>[]},settings:{get:()=>1}};
   let c=researchContext(colony,user);
-  assert.equal(c.statusMap['basic-workshop'].canInvest,false);
-  assert.match(c.statusMap['basic-workshop'].investBlockedReason,/мастерская/);
+  assert.equal(c.statusMap['basic-workshop-step-1'].canInvest,false);
+  assert.match(c.statusMap['basic-workshop-step-1'].investBlockedReason,/мастерская/);
   colony.system.science.facilities.push('bench');
   c=researchContext(colony,user);
-  assert.equal(c.statusMap['basic-workshop'].canInvest,true);
-  assert.equal(c.statusMap['basic-workshop'].investBlockedReason,'');
+  assert.equal(c.statusMap['basic-workshop-step-1'].canInvest,true);
+  assert.equal(c.statusMap['basic-workshop-step-1'].investBlockedReason,'');
   colony.system.science.points=0;
   c=researchContext(colony,user);
-  assert.equal(c.statusMap['basic-workshop'].canInvest,false);
-  assert.match(c.statusMap['basic-workshop'].investBlockedReason,/свободных очков/);
+  assert.equal(c.statusMap['basic-workshop-step-1'].canInvest,false);
+  assert.match(c.statusMap['basic-workshop-step-1'].investBlockedReason,/свободных очков/);
 });
 test('filter automatically selects a visible technology or empty state',()=>{
   assert.match(sheet,/if\(!visible\.includes\(this\._techSelected\)\)this\._techSelected=visible\[0\]\|\|''/);

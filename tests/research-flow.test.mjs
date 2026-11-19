@@ -46,35 +46,42 @@ test('scientist cannot gain more RP twice in the same in-game day',async()=>{
  assert.equal(x.science.dailyWork.length,1);
  assert.equal(x.messages.at(-1).kind,'error');
 });
-test('a research that needs materials waits for supply, then consumes it on completion',async()=>{
+test('final mini-research waits for supplies and unlocks shelter exactly once',async()=>{
+ const {RESEARCH_PROGRAM_BY_ID}=await import('../module/tech-data.mjs');
  const x=fakeGame({points:30,stock:[['wood',2]]});
- // Compatibility: a world created before v1.1 already has the legacy parent researched.
- x.science.unlocked=['survey'];
- await requestResearch({action:'invest',colonyId:'col',techId:'shelter',amount:5});
- assert.deepEqual(x.science.unlocked,['survey']);assert.equal(x.science.projects[0].invested,5);
+ const programme=RESEARCH_PROGRAM_BY_ID.shelter;
+ x.science.unlocked=['survey',...programme.studies.slice(0,-1).map(t=>t.id)];
+ const final=programme.studies.at(-1);
+ await requestResearch({action:'invest',colonyId:'col',techId:final.id,amount:final.rp});
+ assert.equal(x.science.unlocked.includes('shelter'),false);
+ assert.equal(x.science.projects.find(p=>p.id===final.id).invested,final.rp);
  x.colony.items._all.push({id:'f1',type:'material',name:'Fiber',system:{resourceCode:'fiber',quantity:2}});
- await requestResearch({action:'complete',colonyId:'col',techId:'shelter'});
- assert.deepEqual(x.science.unlocked,['survey','shelter']);
+ await requestResearch({action:'complete',colonyId:'col',techId:final.id});
+ assert.equal(x.science.unlocked.includes('shelter'),true);
+ assert.equal(x.science.unlocked.includes(final.id),true);
  assert.equal(x.colony.items._all.find(i=>i.id==='f1').system.quantity,0);
  assert.equal(x.colony.items._all.find(i=>i.system.resourceCode==='wood').system.quantity,0);
 });
-test('material rollback on research save failure',async()=>{
+test('materials are rolled back if final mini-research fails while saving',async()=>{
+ const {RESEARCH_PROGRAM_BY_ID}=await import('../module/tech-data.mjs');
  const x=fakeGame({points:20,stock:[['wood',2],['fiber',2]],failColonyUpdate:true});
- // prepare the science for a funded project outside update to trigger save failure at completion
- x.science.unlocked=['survey'];x.science.projects=[{id:'shelter',invested:5}];
- await requestResearch({action:'complete',colonyId:'col',techId:'shelter'});
+ const studies=RESEARCH_PROGRAM_BY_ID.shelter.studies;
+ const last=studies.at(-1);
+ x.science.unlocked=['survey',...studies.slice(0,-1).map(t=>t.id)];
+ x.science.projects=[{id:last.id,invested:last.rp}];
+ await requestResearch({action:'complete',colonyId:'col',techId:last.id});
  assert.equal(x.colony.items._all[0].system.quantity,2);
  assert.equal(x.colony.items._all[1].system.quantity,2);
- assert.deepEqual(x.science.unlocked,['survey']);
+ assert.equal(x.science.unlocked.includes('shelter'),false);
  assert.equal(x.messages.at(-1).kind,'error');
 });
 test('GM infrastructure toggles and blocks non-ready invest for laboratory tech',async()=>{
  const x=fakeGame({points:30});
  x.science.unlocked=['survey','shelter','stone-tools'];
- await requestResearch({action:'invest',colonyId:'col',techId:'basic-workshop',amount:2});
+ await requestResearch({action:'invest',colonyId:'col',techId:'basic-workshop-step-1',amount:2});
  assert.equal(x.science.points,30);
  await requestResearch({action:'facility',colonyId:'col',facilityId:'bench'});
- await requestResearch({action:'invest',colonyId:'col',techId:'basic-workshop',amount:2});
+ await requestResearch({action:'invest',colonyId:'col',techId:'basic-workshop-step-1',amount:2});
  assert.equal(x.science.points,28);
  assert.deepEqual(x.science.facilities,['bench']);
 });

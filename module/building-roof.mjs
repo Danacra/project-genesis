@@ -4,6 +4,7 @@
  */
 import {tileAsset} from './map-rules.mjs';
 const SYSTEM='project-genesis';
+const SYSTEM_PREFIX=`systems/${SYSTEM}/assets/buildings/`;
 const LEGACY=`systems/${SYSTEM}/assets/buildings/shelter.svg`;
 export async function upgradeShelterRoofTiles(world=game){
   if(!world?.user?.isGM)return 0;
@@ -48,6 +49,37 @@ export async function upgradeDefaultWorkbenchTiles(world=game){
   for(const [scene,rows] of grouped){
     try{await scene.updateEmbeddedDocuments('Tile',rows);updated+=rows.length;}
     catch(error){console.error('PROJECT GENESIS: не удалось обновить тайлы верстаков',scene.id,error);}
+  }
+  return updated;
+}
+
+/** v1.4: upgrade only untouched, system-owned art, never user-custom textures.
+ * One grouped scene update prevents duplicate work and works with old v1.3.4+ worlds.
+ */
+export async function upgradeDefaultBuildingTiles(world=game){
+  if(!world?.user?.isGM)return 0;
+  const grouped=new Map();
+  for(const colony of world.actors?.filter?.(a=>a.type==='colony')||[]){
+    for(const p of colony.system?.industry?.placements||[]){
+      if(p.status!=='finished'||!p.tileId)continue;
+      const scene=world.scenes?.get?.(p.sceneId),tile=scene?.tiles?.get?.(p.tileId);
+      if(!scene||!tile)continue;
+      const flags=tile.flags?.[SYSTEM];
+      if(flags?.colonyId!==colony.id||flags?.placementId!==p.id||flags?.buildingId!==p.buildingId||flags?.status!=='finished')continue;
+      const old=tile.texture?.src;
+      const candidates=new Set([`${tileAsset(p.buildingId,false).replace('construction-site.svg',p.buildingId+'.svg')}`]);
+      if(p.buildingId==='shelter')candidates.add(`${SYSTEM_PREFIX}shelter-roof.png`);
+      if(p.buildingId==='bench')candidates.add(`${SYSTEM_PREFIX}bench-top.png`);
+      const target=tileAsset(p.buildingId,true);
+      if(old===target||!candidates.has(old))continue;
+      if(!grouped.has(scene))grouped.set(scene,[]);
+      grouped.get(scene).push({_id:tile.id,'texture.src':target});
+    }
+  }
+  let updated=0;
+  for(const [scene,rows]of grouped){
+    try{await scene.updateEmbeddedDocuments('Tile',rows);updated+=rows.length;}
+    catch(error){console.error('PROJECT GENESIS: tile art migration failed',scene.id,error);}
   }
   return updated;
 }

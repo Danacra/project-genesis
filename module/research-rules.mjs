@@ -1,5 +1,5 @@
 /** Pure research rules. All requirements are fictional resource codes. */
-import { TECHNOLOGIES, TECHNOLOGY_BY_ID, RESEARCH_BY_ID, FIELD_STUDIES, FIELD_STUDY_BY_ID, FIELD_PHASES, RECIPE_LIBRARY, RESOURCE_LABELS, FACILITIES } from './tech-data.mjs';
+import { TECHNOLOGIES, TECHNOLOGY_BY_ID, RESEARCH_BY_ID, FIELD_STUDIES, FIELD_STUDY_BY_ID, FIELD_PHASES, RESEARCH_PROGRAMS, PROGRAM_STUDIES, RESEARCH_PROGRAM_BY_ID, RECIPE_LIBRARY, RESOURCE_LABELS, FACILITIES } from './tech-data.mjs';
 const owned = arr => Array.isArray(arr) ? arr : [];
 export function stockByCode(items) {
   const counts = Object.create(null);
@@ -13,27 +13,40 @@ export function stockByCode(items) {
 }
 export function effectiveUnlocked(science={}) {
   const unlocked=new Set(owned(science.unlocked));
-  // Previous worlds that already researched the original four-point "survey"
-  // remain playable; their substudies appear completed without paid rework.
-  if(unlocked.has('survey')) for(const study of FIELD_STUDIES)unlocked.add(study.id);
-  if(FIELD_STUDIES.every(study=>unlocked.has(study.id)))unlocked.add('survey');
+  // A previously opened composite technology stays complete after updating.
+  // Child completion never mutates historic saves until the next legitimate action.
+  for(const programme of RESEARCH_PROGRAMS) {
+    if(unlocked.has(programme.id))for(const study of programme.studies)unlocked.add(study.id);
+    if(programme.studies.every(study=>unlocked.has(study.id)))unlocked.add(programme.id);
+  }
   return unlocked;
 }
-export function techStatus(techId, science = {}, items = []) {
+
+export function techStatus(techId, science = {}, items = [], cached = null) {
   const tech = RESEARCH_BY_ID[techId];
   if (!tech) throw new Error('Неизвестная технология.');
-  const unlocked = effectiveUnlocked(science);
-  if(techId==='survey') {
-    const completed=FIELD_STUDIES.filter(study=>unlocked.has(study.id)).length;
-    return {tech,unlocked:unlocked.has('survey'),progress:completed,required:FIELD_STUDIES.length,
-      percent:completed*100/FIELD_STUDIES.length,missingParents:[],missingFacilities:[],materials:[],
-      missingStudies:FIELD_STUDIES.filter(study=>!unlocked.has(study.id)).map(t=>t.id),
-      prerequisitesReady:completed===FIELD_STUDIES.length,facilityReady:true,materialReady:true,
-      ready:completed===FIELD_STUDIES.length,canFinish:false,isGroup:true};
+  const unlocked = cached?.unlocked ?? effectiveUnlocked(science);
+  const programme=RESEARCH_PROGRAM_BY_ID[techId];
+  if(programme) {
+    const completed=programme.studies.filter(study=>unlocked.has(study.id)).length;
+    const missingParents=tech.parents.filter(id=>!unlocked.has(id));
+    const stock=cached?.stock ?? stockByCode(items);
+    const materials=Object.entries(tech.requires).map(([code,amount])=>({
+      code,name:RESOURCE_LABELS[code]||code,required:amount,available:stock[code]||0,
+      ok:(stock[code]||0)>=amount
+    }));
+    const availableFacilities=cached?.facilities ?? new Set(owned(science.facilities));
+    const missingFacilities=tech.facilities.filter(id=>!availableFacilities.has(id));
+    return {tech,unlocked:unlocked.has(techId),progress:completed,required:programme.studies.length,
+      percent:Math.round(completed*100/programme.studies.length),missingParents,missingFacilities,materials,
+      missingStudies:programme.studies.filter(study=>!unlocked.has(study.id)).map(t=>t.id),
+      prerequisitesReady:missingParents.length===0,facilityReady:missingFacilities.length===0,
+      materialReady:materials.every(m=>m.ok),ready:completed===programme.studies.length,
+      canFinish:false,isGroup:true};
   }
-  const facilities = new Set(owned(science.facilities));
+  const facilities = cached?.facilities ?? new Set(owned(science.facilities));
   const progress = owned(science.projects).find(p=>p.id===techId)?.invested || 0;
-  const stock = stockByCode(items);
+  const stock = cached?.stock ?? stockByCode(items);
   const missingParents = tech.parents.filter(id => !unlocked.has(id));
   const missingFacilities = tech.facilities.filter(id => !facilities.has(id));
   const materials = Object.entries(tech.requires).map(([code,amount])=>({
@@ -52,7 +65,7 @@ export function techStatus(techId, science = {}, items = []) {
   };
 }
 export function planInvestment(science, techId, amount) {
-  if(techId==='survey')throw new Error('Полевые наблюдения завершаются после изучения всех 10 мини-исследований.');
+  if(RESEARCH_PROGRAM_BY_ID[techId])throw new Error('Составная программа завершается после изучения всех 10 мини-исследований.');
   const status=techStatus(techId,science);
   if (status.unlocked) throw new Error('Эта технология уже изучена.');
   if (!status.prerequisitesReady) throw new Error('Сначала изучите предыдущие технологии.');
@@ -68,7 +81,7 @@ export function planInvestment(science, techId, amount) {
 }
 export function planMaterialUse(techId, items) {
   const tech=RESEARCH_BY_ID[techId];
-  if (!tech || techId==='survey') throw new Error('Неизвестное исследование или составная программа.');
+  if (!tech) throw new Error('Неизвестное исследование.');
   const stock=stockByCode(items);
   for (const [code,amount] of Object.entries(tech.requires)) {
     if ((stock[code] || 0) < amount) throw new Error(`Недостаточно ресурсов: ${RESOURCE_LABELS[code] || code}.`);
@@ -90,22 +103,22 @@ export function planMaterialUse(techId, items) {
 }
 export function completionPatch(science, techId, userName, day) {
   const tech=RESEARCH_BY_ID[techId], projects=owned(science.projects);
-  if (!tech || techId==='survey') throw new Error('Составную программу завершают её мини-исследования.');
-  const wasUnlocked=effectiveUnlocked(science);
+  if (!tech || RESEARCH_PROGRAM_BY_ID[techId]) throw new Error('Составную программу завершают её мини-исследования.');
   const nextUnlocked=[...new Set([...owned(science.unlocked),techId])];
-  const finishedGroup=!!tech.group && !owned(science.unlocked).includes('survey') &&
-    FIELD_STUDIES.every(t=>nextUnlocked.includes(t.id));
-  if(finishedGroup)nextUnlocked.push('survey');
-  const nextProjects=projects.filter(p=>p.id!==techId && !(finishedGroup && p.id==='survey'));
+  const group=tech.group?RESEARCH_PROGRAM_BY_ID[tech.group]:null;
+  const finishedGroup=group && !owned(science.unlocked).includes(group.id) &&
+    group.studies.every(t=>nextUnlocked.includes(t.id));
+  if(finishedGroup)nextUnlocked.push(group.id);
+  const nextProjects=projects.filter(p=>p.id!==techId && !(finishedGroup && p.id===group.id));
   const discoveries=[...owned(science.discoveries),{techId,day,by:String(userName).slice(0,100)}];
-  if(finishedGroup)discoveries.push({techId:'survey',day,by:String(userName).slice(0,100)});
+  if(finishedGroup)discoveries.push({techId:group.id,day,by:String(userName).slice(0,100)});
   const patch={unlocked:nextUnlocked,projects:nextProjects,
     tier:Math.max(Number(science.tier)||0,tech.t),discoveries:discoveries.slice(-250)};
   if(finishedGroup) {
-    // The old four-point project may have been partly funded prior to migration.
-    // Return that amount instead of silently discarding player progress.
-    const oldFunding=projects.find(p=>p.id==='survey')?.invested || 0;
-    if(oldFunding)patch.points=Math.min(9999999,Number(science.points||0)+Math.min(4,Math.max(0,oldFunding)));
+    // Refund abandoned funding for the pre-upgrade one-step research.
+    const oldFunding=projects.find(p=>p.id===group.id)?.invested||0;
+    if(oldFunding)patch.points=Math.min(9999999,Number(science.points||0)+Math.min(
+      RESEARCH_BY_ID[group.id].rp,Math.max(0,oldFunding)));
   }
   return patch;
 }
@@ -135,5 +148,23 @@ export function validateCatalog() {
     subtree.add(tech.id);
   }
   if(subtree.size!==10)throw Error('Field research must contain exactly ten studies.');
-  return {technologies:ids.size,subresearch:subtree.size,recipes:Object.keys(RECIPE_LIBRARY).length};
+  const registered=new Set();
+  for(const programme of RESEARCH_PROGRAMS) {
+    if(!ids.has(programme.id)||programme.studies.length!==10||programme.phases.length!==4)
+      throw Error(`Invalid nested research programme: ${programme.id}`);
+    const observedIds=new Set();
+    const phaseIds=new Set(programme.phases.map(p=>p.id));
+    for(const study of programme.studies) {
+      if(registered.has(study.id)||ids.has(study.id)||study.group!==programme.id||!phaseIds.has(study.phase))
+        throw Error(`Invalid nested study: ${study.id}`);
+      if(!Number.isInteger(study.rp)||study.rp<1||study.rp>5)throw Error(`Invalid study cost: ${study.id}`);
+      for(const parent of study.parents)if(!observedIds.has(parent)&&!ids.has(parent))
+        throw Error(`Invalid prerequisite: ${study.id} -> ${parent}`);
+      for(const station of study.facilities)if(!(station in FACILITIES))throw Error(`Unknown station: ${station}`);
+      observedIds.add(study.id);registered.add(study.id);
+    }
+  }
+  if(registered.size!==80)throw Error('Initial programmes must contain eighty studies.');
+  return {technologies:ids.size,subresearch:subtree.size,programmeResearch:registered.size,
+    programmes:RESEARCH_PROGRAMS.length,recipes:Object.keys(RECIPE_LIBRARY).length};
 }

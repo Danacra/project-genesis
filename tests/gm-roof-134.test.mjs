@@ -17,9 +17,9 @@ function setup({isGM=true,src=old,sceneExists=true}={}){
   return {world,scene,tile,colony};
 }
 test('rooftop picture is a real shipped transparent PNG without changing footprint',()=>{
-  assert.ok(newer.endsWith('/shelter-roof.png'));
-  assert.ok(existsSync(new URL('../assets/buildings/shelter-roof.png',import.meta.url)));
-  assert.ok(statSync(new URL('../assets/buildings/shelter-roof.png',import.meta.url)).size>100_000);
+  assert.ok(newer.endsWith('/shelter.png'));
+  assert.ok(existsSync(new URL('../assets/buildings/shelter.png',import.meta.url)));
+  assert.ok(statSync(new URL('../assets/buildings/shelter.png',import.meta.url)).size>100_000);
   assert.equal(tileAsset('shelter',false).endsWith('construction-site.svg'),true);
 });
 test('GM migrates old default art once and does not change it on a second run',async()=>{

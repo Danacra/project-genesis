@@ -1,6 +1,6 @@
 /** GM-coordinated shared colony research, Foundry v13. */
-import { TECHNOLOGIES, TECHNOLOGY_BY_ID, RESEARCH_BY_ID, FIELD_STUDIES, FIELD_PHASES, BRANCHES, FACILITIES, RECIPE_LIBRARY } from './tech-data.mjs';
-import { techStatus, planInvestment, planMaterialUse, completionPatch, unlockedRecipes } from './research-rules.mjs';
+import { TECHNOLOGIES, TECHNOLOGY_BY_ID, RESEARCH_BY_ID, FIELD_STUDIES, FIELD_PHASES, RESEARCH_PROGRAMS, PROGRAM_STUDIES, RESEARCH_PROGRAM_BY_ID, BRANCHES, FACILITIES, RECIPE_LIBRARY } from './tech-data.mjs';
+import { techStatus, stockByCode, effectiveUnlocked, planInvestment, planMaterialUse, completionPatch, unlockedRecipes } from './research-rules.mjs';
 import { withWorldLock } from './logistics.mjs';
 import {availableEras,availableFieldPhases,obscureBlueprints} from './discovery-visibility.mjs';
 import { stationOperational } from './networks.mjs';
@@ -20,11 +20,21 @@ export function colonyFor(actor) {
 export function researchContext(colony, user, networkSimulation=null) {
   if(!colony)return {available:false};
   const science=colony.system.science;
-  const statusMap=Object.fromEntries([...TECHNOLOGIES,...FIELD_STUDIES].map(t=>{
-    const status=techStatus(t.id,science,colony.items);
-    const powerReady=t.facilities.every(id=>stationOperational(colony,id,networkSimulation));
-    const remaining=t.id==='survey'?0:Math.max(0,t.rp-status.progress);
-    const investBlockedReason=t.id==='survey'?'Завершите десять мини-исследований внутри программы.':
+  // A single snapshot is shared by all 105 technology and subresearch cards.
+  // This avoids rescanning a large colony inventory for each mini-research.
+  const accessibleUnlocks=effectiveUnlocked(science);
+  const researchCache={unlocked:accessibleUnlocks,stock:stockByCode(colony.items),
+    facilities:new Set(science.facilities||[])};
+  const stationCache=new Map();
+  const statusMap=Object.fromEntries([...TECHNOLOGIES,...PROGRAM_STUDIES].map(t=>{
+    const status=techStatus(t.id,science,colony.items,researchCache);
+    const powerReady=t.facilities.every(id=>{
+      if(!stationCache.has(id))stationCache.set(id,stationOperational(colony,id,networkSimulation));
+      return stationCache.get(id);
+    });
+    const isGroup=!!RESEARCH_PROGRAM_BY_ID[t.id];
+    const remaining=isGroup?0:Math.max(0,t.rp-status.progress);
+    const investBlockedReason=isGroup?'Завершите десять мини-исследований внутри программы.':
       status.unlocked?'Технология уже изучена.':
       !status.prerequisitesReady?'Сначала изучите предыдущие технологии.':
       !status.facilityReady?'Необходимая лаборатория или мастерская отсутствует.':
@@ -32,14 +42,14 @@ export function researchContext(colony, user, networkSimulation=null) {
       !remaining?'Исследование уже полностью профинансировано.':
       !science.points?'Нет свободных очков исследований.':'';
     return [t.id,{...status,powerReady,canInvest:!investBlockedReason,
-      canWork:t.id!=='survey'&&!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
+      canWork:!isGroup&&!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
       canFinish:status.canFinish&&powerReady,investBlockedReason}];
   }));
-  const eraAccess=availableEras(TECHNOLOGIES,science.unlocked,user.isGM);
-  const phaseAccess=availableFieldPhases(FIELD_PHASES,FIELD_STUDIES,science.unlocked,user.isGM);
+  const eraAccess=availableEras(TECHNOLOGIES,[...accessibleUnlocks],user.isGM);
+  const phaseAccess=availableFieldPhases(FIELD_PHASES,FIELD_STUDIES,[...accessibleUnlocks],user.isGM);
   const eras=[0,1,2,3,4].filter(t=>eraAccess.has(t)).map(t=>({tier:t,label:['01 · ПОЛЕВОЙ ЭТАП','02 · РЕМЕСЛО','03 · НАУЧНАЯ БАЗА','04 · ПРОМЫШЛЕННОСТЬ','05 · КОСМОС'][t],nodes:TECHNOLOGIES.filter(x=>x.t===t).map(x=>({
     ...x,...statusMap[x.id],branchLabel:BRANCHES[x.branch],shortParent:x.parents.length,
-    statusLabel:x.id==='survey'?`${statusMap[x.id].progress}/10 исследований · ${statusMap[x.id].unlocked?'завершено':'открыть'}`:
+    statusLabel:RESEARCH_PROGRAM_BY_ID[x.id]?`${statusMap[x.id].progress}/10 исследований · ${statusMap[x.id].unlocked?'завершено':'открыть'}`:
       statusMap[x.id].unlocked?'Изучено':statusMap[x.id].canFinish?'Готово к открытию':statusMap[x.id].missingParents.length?'Заблокировано':`${statusMap[x.id].progress}/${x.rp} ОИ`
   }))}));
   const currentDay=day();
@@ -65,9 +75,29 @@ export function researchContext(colony, user, networkSimulation=null) {
     requiredFacilityNames:tech.facilities.map(id=>FACILITIES[id]),
     parentsNames:tech.parents.map(id=>TECHNOLOGY_BY_ID[id].name),
     recipesNames:tech.recipes.map(id=>user.isGM||statusMap[tech.id].unlocked?(RECIPE_LIBRARY[id]||id):'???'),
-    remaining:tech.id==='survey'?0:Math.max(0,tech.rp-statusMap[tech.id].progress)
+    remaining:RESEARCH_PROGRAM_BY_ID[tech.id]?0:Math.max(0,tech.rp-statusMap[tech.id].progress)
   }));
-  return {available:true,colonyId:colony.id,colonyName:colony.name,science,eras,details,subPhases,subDetails,
+  const programmes=RESEARCH_PROGRAMS.filter(programme=>eraAccess.has(RESEARCH_BY_ID[programme.id].t)).map(programme=>{
+    const parentStatus=statusMap[programme.id];
+    const allowedPhases=availableFieldPhases(programme.phases,programme.studies,[...accessibleUnlocks],user.isGM);
+    const phases=programme.phases.filter(phase=>allowedPhases.has(phase.id)).map(phase=>({...phase,
+      nodes:programme.studies.filter(t=>t.phase===phase.id).map(t=>({
+        ...t,...statusMap[t.id],branchLabel:BRANCHES[t.branch],
+        statusLabel:statusMap[t.id].unlocked?'Изучено':!statusMap[t.id].prerequisitesReady?'Требует открытий':`${statusMap[t.id].progress}/${t.rp} ОИ`,
+        parentNames:t.parents.map(id=>RESEARCH_BY_ID[id].name)
+      }))}));
+    const details=programme.studies.filter(t=>allowedPhases.has(t.phase)).map(t=>({
+      ...t,...statusMap[t.id],branchLabel:BRANCHES[t.branch],
+      remaining:Math.max(0,t.rp-statusMap[t.id].progress),
+      missingParentNames:statusMap[t.id].missingParents.map(id=>RESEARCH_BY_ID[id].name),
+      parentsNames:t.parents.map(id=>RESEARCH_BY_ID[id].name),
+      missingFacilityNames:statusMap[t.id].missingFacilities.map(id=>FACILITIES[id])
+    }));
+    return {id:programme.id,name:programme.name,description:RESEARCH_BY_ID[programme.id].description,
+      done:parentStatus.progress,total:programme.studies.length,complete:parentStatus.unlocked,
+      percent:parentStatus.percent,phases,details,firstId:programme.studies[0].id};
+  });
+  return {available:true,colonyId:colony.id,colonyName:colony.name,science,eras,details,programmes,subPhases,subDetails,
     subDone:statusMap.survey.progress,subTotal:FIELD_STUDIES.length,subComplete:statusMap.survey.unlocked,
     statusMap,branches,facilities:Object.entries(FACILITIES).map(([id,name])=>({id,name,active:(science.facilities||[]).includes(id)})),
     recipes:obscureBlueprints(unlockedRecipes(science),user.isGM),canResearch:user.isGM||availablePeople.length>0,
@@ -86,7 +116,7 @@ function authorize(request) {
 }
 function assertProjectReady(colony,techId) {
   const status=techStatus(techId,colony.system.science,colony.items);
-  if(techId==='survey')throw new Error('Откройте десять мини-исследований внутри программы «Полевые наблюдения».');
+  if(RESEARCH_PROGRAM_BY_ID[techId])throw new Error('Откройте десять мини-исследований внутри этой научной программы.');
   if(status.unlocked)throw new Error('Открытие уже исследовано.');
   if(!status.prerequisitesReady)throw new Error('Не исследованы предшествующие технологии.');
   if(!status.facilityReady)throw new Error('Для работы необходимы лаборатория или мастерская.');
@@ -117,7 +147,7 @@ async function finish(colony,techId,user) {
     await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · Научное открытие</strong><p>Колония ${escape(colony.name)} исследовала «${escape(RESEARCH_BY_ID[techId].name)}» (день ${day()}).</p></div>`});
   }catch(error){console.warn('PROJECT GENESIS: science notification failed',error);}
   return `Открыто исследование: ${RESEARCH_BY_ID[techId].name}.`+
-    (RESEARCH_BY_ID[techId].group && colony.system.science.unlocked.includes('survey')?' Полевые наблюдения завершены!':'');
+    (RESEARCH_BY_ID[techId].group && colony.system.science.unlocked.includes(RESEARCH_BY_ID[techId].group)?` Программа «${RESEARCH_BY_ID[RESEARCH_BY_ID[techId].group].name}» завершена!`:'');
 }
 async function commit(request) {
   if(!/^[\w-]{12,80}$/.test(request.id||''))throw new Error('Некорректный идентификатор действия.');
@@ -125,7 +155,7 @@ async function commit(request) {
   const {u,colony}=authorize(request);
   const tech=RESEARCH_BY_ID[request.techId];
   if(!tech && request.action!=='facility' && request.action!=='grant')throw new Error('Неизвестное исследование.');
-  if(tech?.id==='survey' && ['work','invest','complete'].includes(request.action))throw new Error('Начните с десяти исследований внутри «Полевых наблюдений».');
+  if(tech && RESEARCH_PROGRAM_BY_ID[tech.id] && ['work','invest','complete'].includes(request.action))throw new Error('Выберите мини-исследование внутри программы.');
   let result;
   if(request.action==='work') {
     const status=assertProjectReady(colony,request.techId);
@@ -211,4 +241,4 @@ export function initializeResearch() {
     });
   });
 }
-export { TECHNOLOGIES, FIELD_STUDIES, BRANCHES, FACILITIES };
+export { TECHNOLOGIES, FIELD_STUDIES, PROGRAM_STUDIES, RESEARCH_PROGRAMS, BRANCHES, FACILITIES };

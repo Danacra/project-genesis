@@ -1,9 +1,9 @@
 /** PROJECT GENESIS 0.5 — gameplay abstractions, not real industrial instructions. */
 import { RECIPE_LIBRARY, TECHNOLOGY_BY_ID, FACILITIES, RESOURCE_LABELS } from './tech-data.mjs';
-const recipe = (id, inputs, output, station=null, days=1, description='') => Object.freeze({
+const recipe = (id, inputs, output, station=null, days=1, description='',minTier=1) => Object.freeze({
   id, name:RECIPE_LIBRARY[id], techId:Object.values(TECHNOLOGY_BY_ID).find(t=>t.recipes.includes(id))?.id,
   inputs, output:{code:id.replaceAll('-','_'),type:'component',unitMass:1,unitVolume:1,quantity:1,...output},
-  station, days, description
+  station, days, description,minTier
 });
 export const RECIPES = Object.freeze([
   recipe('field-notes',{fiber:1},{type:'gear',unitMass:.1,unitVolume:.2},null,1,'Архив экспедиционных наблюдений.'),
@@ -11,6 +11,27 @@ export const RECIPES = Object.freeze([
   recipe('stone-kit',{stone:3,fiber:1},{type:'tool',unitMass:2,unitVolume:3},null,1,'Инструменты начального этапа.'),
   recipe('water-tester',{stone:1,fiber:1,sample:1},{type:'tool',unitMass:.6,unitVolume:1},null,1,'Абстрактный набор для исследования биома.'),
   recipe('field-collection',{wood:1,fiber:2},{type:'tool',unitMass:1,unitVolume:2},null,1,'Принадлежности для полевых наблюдений.'),
+  recipe('sawn-planks',{wood:2},{code:'plank',type:'material',quantity:3,unitMass:.9,unitVolume:1.1},'bench',1,'Игровое изготовление досок из древесины.'),
+  recipe('cut-stone',{stone:2},{code:'cut_stone',type:'material',quantity:2,unitMass:1.6,unitVolume:1.1},'bench',1,'Отбор и обработка камня.'),
+  recipe('woven-cloth',{fiber:3},{code:'cloth',type:'material',quantity:2,unitMass:.3,unitVolume:.6},'bench',1,'Ткань из растительных волокон.'),
+  recipe('fired-brick',{clay:3},{code:'brick',type:'material',quantity:3,unitMass:1.2,unitVolume:.7},'furnace',1,'Обжиг условной глиняной массы.'),
+  recipe('metal-ingot',{ore:3},{code:'ingot',type:'material',quantity:2,unitMass:1.8,unitVolume:.7},'furnace',2,'Переплавка рудного сырья в игровые слитки.'),
+  recipe('copper-smelt',{copper:2},{code:'copper_ingot',type:'material',quantity:2,unitMass:1.4,unitVolume:.65},'furnace',2,'Переработка медной руды.'),
+  recipe('iron-smelt',{iron_ore:3},{code:'iron_ingot',type:'material',quantity:2,unitMass:1.8,unitVolume:.7},'furnace',2,'Переплавка железной руды в базовые слитки.'),
+  recipe('tin-smelt',{tin_ore:2},{code:'tin_ingot',type:'material',quantity:2,unitMass:1.2,unitVolume:.6},'furnace',2,'Переработка оловянной руды.'),
+  recipe('aluminum-smelt',{aluminum_ore:3},{code:'aluminum_ingot',type:'material',quantity:2,unitMass:1.1,unitVolume:.8},'furnace',2,'Переработка алюминиевой руды в лёгкий металл.'),
+  recipe('titanium-smelt',{titanium_ore:3},{code:'titanium_ingot',type:'material',quantity:1,unitMass:1.7,unitVolume:.6},'furnace',3,'Трудоёмкая выплавка титанового слитка.'),
+  recipe('bronze-alloy',{copper_ingot:2,tin_ingot:1},{code:'bronze_ingot',type:'material',quantity:2,unitMass:1.6,unitVolume:.7},'furnace',2,'Базовый сплав для усиленных компонентов.',2),
+  recipe('steel-alloy',{iron_ingot:2,ingot:1},{code:'steel_ingot',type:'material',quantity:2,unitMass:2.1,unitVolume:.8},'furnace',3,'Прочный сплав для тяжёлых деталей.',2),
+  recipe('reinforced-alloy',{ingot:3,copper_ingot:1},{code:'reinforced_ingot',type:'material',quantity:2,unitMass:2.4,unitVolume:1},'furnace',3,'Улучшенный материал для поздней базы.',2),
+  recipe('precision-joinery',{plank:2,cloth:1},{code:'joinery_kit',type:'component',quantity:1,unitMass:1.2,unitVolume:1.4},'bench',1,'Сборочные соединения для последующего улучшения мастерской.',2),
+  recipe('calibrated-toolkit',{ingot:2,joinery_kit:1},{code:'calibrated_toolkit',type:'tool',quantity:1,unitMass:1.6,unitVolume:2},'bench',1,'Инструмент повышенного уровня для сложных заготовок.',3),
+  recipe('survey-instrument',{glass:1,plank:2},{code:'survey_instrument',type:'tool',quantity:1,unitMass:1,unitVolume:1.5},'fieldLab',2,'Уточнённые полевые измерения.',2),
+  recipe('medical-supplies',{cloth:2,organic:2},{code:'med_supplies',type:'consumable',quantity:2,unitMass:.3,unitVolume:.4},'bioLab',2,'Лабораторные медицинские материалы.',2),
+  recipe('copper-wire',{copper_ingot:1},{code:'wire_bundle',type:'component',quantity:2,unitMass:.3,unitVolume:.3},'bench',1,'Подготовка базовой проводки для электрических систем.',2),
+  recipe('voltage-module',{copper_ingot:2,circuit:1},{code:'voltage_module',type:'component',quantity:1,unitMass:2,unitVolume:1.5},'powerLab',2,'Регулятор распределения энергии.',2),
+  recipe('control-terminal',{circuit:2,reinforced_ingot:1},{code:'control_terminal',type:'component',quantity:1,unitMass:2.3,unitVolume:1.8},'electronicsLab',3,'Модуль высокоуровневого управления.',2),
+  recipe('flight-calibrator',{alloy:2,crystal:1},{code:'flight_calibrator',type:'component',quantity:1,unitMass:3,unitVolume:3},'flightLab',3,'Испытательное оборудование поздней экспедиции.',2),
   recipe('workshop-tools',{wood:2,scrap:2},{type:'tool',unitMass:3,unitVolume:4},'bench',1,'Базовый инструментальный комплект.'),
   recipe('growth-module',{wood:2,fiber:2,organic:2},{unitMass:7,unitVolume:12},'fieldLab',2,'Экспериментальный аграрный модуль.'),
   recipe('geology-kit',{stone:2,scrap:1},{type:'tool',unitMass:2,unitVolume:3},'bench',1,'Набор для классификации пород.'),
@@ -23,6 +44,9 @@ export const RECIPES = Object.freeze([
   recipe('basic-generator',{copper:3,alloy:2},{unitMass:10,unitVolume:12},'powerLab',3),
   recipe('optical-device',{glass:2,crystal:1},{type:'tool',unitMass:1,unitVolume:2},'fieldLab',2),
   recipe('flow-controller',{alloy:2,glass:1},{unitMass:4,unitVolume:5},'bench',2),
+  recipe('iron-fittings',{iron_ingot:2,plank:1},{code:'iron_fittings',type:'component',quantity:2,unitMass:1.1,unitVolume:.6},'bench',2,'Крепёж и усилители для зданий и станков.',3),
+  recipe('steel-plate',{steel_ingot:2},{code:'steel_plate',type:'material',quantity:2,unitMass:1.9,unitVolume:.8},'furnace',2,'Стальные пластины для промышленной сборки.',3),
+  recipe('titanium-frame',{titanium_ingot:1,steel_plate:1},{code:'titanium_frame',type:'component',quantity:1,unitMass:1.4,unitVolume:1.1},'flightLab',3,'Лёгкая и прочная силовая рама.',3),
   recipe('precision-parts',{alloy:3,glass:1},{unitMass:2,unitVolume:2},'furnace',3),
   recipe('power-unit',{copper:2,crystal:1,alloy:1},{unitMass:6,unitVolume:7},'powerLab',3),
   recipe('control-board',{silicon:2,copper:2},{code:'circuit',quantity:2,unitMass:.5,unitVolume:.5},'electronicsLab',3),
@@ -41,7 +65,7 @@ const build = (id,name,techId,inputs,days=2,facility=null,options={}) => Object.
 export const BUILDINGS = Object.freeze([
   build('bench','Верстак','stone-tools',{wood:3,stone:2},1,'bench',{description:'Простой рабочий пост для базовых рецептов.'}),
   build('fieldLab','Полевая лаборатория','water-analysis',{wood:2,scrap:1,sample:2},2,'fieldLab',{description:'Полевые исследования и изготовление научных комплектов; ручной режим возможен без питания.'}),
-  build('furnace','Промышленная мастерская','geology',{stone:5,clay:3,scrap:2},3,'furnace',{description:'Производит сплавы, стеклокерамику и промышленные детали по изученным рецептам.'}),
+  build('furnace','Плавильная мастерская','geology',{stone:5,clay:3,scrap:2},3,'furnace',{description:'Выплавляет игровые металлические слитки из руды, обжигает кирпич, выпускает сплавы, стеклокерамику и детали по изученным рецептам.'}),
   build('bioLab','Биолаборатория','medicine',{glass:2,scrap:3,organic:2},3,'bioLab',{description:'Лаборатория биологических исследований и специальных материалов, поддерживает соответствующий крафт.'}),
   build('powerLab','Энергетическая станция','mechanics',{copper:3,scrap:3},3,'powerLab',{description:'Источник 18 условных единиц мощности для электросети базы; подключение выполняется кабелями.'}),
   build('electronicsLab','Лаборатория электроники','optics',{silicon:2,copper:2,glass:2},4,'electronicsLab',{description:'Создаёт электронные компоненты, панели управления и навигационные детали. Требует электричества.'}),
