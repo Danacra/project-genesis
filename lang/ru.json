@@ -1,1 +1,1 @@
-{"PG":{"SystemName":"PROJECT GENESIS","Survivor":"Выживший","NPC":"НПС","Colony":"Колония","Transfer":"Переместить","Day":"День","Inventory":"Инвентарь","Science":"Наука"}}
+{"PG":{"SystemName":"PROJECT GENESIS","Survivor":"Выживший","NPC":"НПС","Colony":"Колония","Transfer":"Переместить","Day":"День","Inventory":"Инвентарь","Science":"Наука"},"TYPES":{"Actor":{"survivor":"Выживший","npc":"НПС","colony":"Колония"},"Item":{"material":"Материал","gear":"Снаряжение","tool":"Инструмент","component":"Компонент","consumable":"Расходник","container":"Контейнер"}}}

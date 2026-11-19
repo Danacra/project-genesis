@@ -400,14 +400,15 @@ function mockTileUpdate(tile){
  tile.update=async fields=>{
    for(const [key,value] of Object.entries(fields)){
      if(key==='texture.src')tile.texture.src=value;
-     if(key==='flags.project-genesis.tier')tile.flags['project-genesis'].tier=value;
+     else if(key==='flags.project-genesis.tier')tile.flags['project-genesis'].tier=value;
+     else if(['x','y','width','height'].includes(key))tile[key]=value;
    }
  };
 }
 test('1.5: GM upgrades one structure to levels 2 and 3 without charging other buildings',async()=>{
  const s=setup({materials:[],tech:[]});
  await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
- await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:400,y:100});
+ await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:900,y:100});
  const [first,second]=s.colony.system.industry.placements;
  const firstTile=s.scene.tiles.get(first.tileId);mockTileUpdate(firstTile);
  await run('upgrade-building',{placementId:first.id,gmFree:true});

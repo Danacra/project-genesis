@@ -6,6 +6,8 @@ import {NETWORK_TYPES,NETWORK_LIMITS,DEVICES,routeNetwork,networkCost,
   validateNetworkLink,asNetworkTiles,simulateNetworks,validateManualRoute} from './network-rules.mjs';
 import {BUILDING_BY_ID} from './industry-data.mjs';
 import {roomPowerLoads,sceneInteriorOf} from './structure-rules.mjs';
+import {tierNumber,chainUpgradePlan,linkCapacity,utilityProfile} from './tier-rules-162.mjs';
+import {effectiveUnlocked} from './research-rules.mjs';
 const SYSTEM='project-genesis',TIMEOUT=60000;
 const awaiting=new Map(),seen=new Set();
 const list=a=>Array.isArray(a)?a:[];
@@ -92,7 +94,7 @@ async function doCommit(request){
       if(tileIds.length!==route.length||tileIds.some(x=>!x))throw Error('Не удалось создать все сегменты сети.');
       if(plan){debitAttempted=true;await colony.updateEmbeddedDocuments('Item',plan.changes);}
       const link={id:networkId,colonyId:colony.id,sceneId:scene.id,type,fromId:a.id,toId:b.id,
-        route,tileIds,createdDay:game.settings.get(SYSTEM,'worldDay'),by:user.name,gmFree};
+        route,tileIds,tier:1,createdDay:game.settings.get(SYSTEM,'worldDay'),by:user.name,gmFree};
       await colony.update(updateInfra({links:[...links,link],processed:newProcessed(infra,request.id)}));
     }catch(error){
       let broken=false;
@@ -119,6 +121,46 @@ async function doCommit(request){
       throw error;
     }
     response=`Сеть демонтирована (${NETWORK_TYPES[link.type]?.name}). Материалы не возвращаются.`;
+  }else if(request.action==='upgrade-chain'||request.action==='gm-upgrade-chain'){
+    const free=request.action==='gm-upgrade-chain';
+    if(free&&!user.isGM)throw Error('Бесплатные улучшения сети доступны только мастеру.');
+    const upgrade=chainUpgradePlan(links,request.linkId);
+    if(!free&&!effectiveUnlocked(colony.system.science).has(upgrade.techId))
+      throw Error('Для кабеля нового уровня требуется технология: '+upgrade.techId);
+    const scene=game.scenes.get(upgrade.members[0].sceneId);
+    if(!scene)throw Error('Сцена инженерной цепи отсутствует.');
+    for(const link of upgrade.members){
+      requirePlaced(colony,link.fromId);requirePlaced(colony,link.toId);
+      if(validateNetworkLink(link,scene)!=='ok')throw Error('Перед модернизацией восстановите повреждённые участки цепи.');
+    }
+    const plan=free?null:planTake(colony.items,upgrade.inputs),before=plan?backupResources(colony,plan.changes):[];
+    const updates=[],previous=[];
+    const grid=sceneGeometry(scene).grid;
+    for(const link of upgrade.need){
+      const patterns=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:colony.id,
+        grid,gmFree:!!link.gmFree,tier:upgrade.next});
+      for(let i=0;i<link.tileIds.length;i++){
+        const tile=scene.tiles.get(link.tileIds[i]);
+        if(!tile)throw Error('Недостающий сегмент сети.');
+        updates.push({_id:tile.id,'texture.src':patterns[i].texture.src,[`flags.${SYSTEM}.tier`]:upgrade.next});
+        previous.push({_id:tile.id,'texture.src':tile.texture.src,[`flags.${SYSTEM}.tier`]:tierNumber(link.tier)});
+      }
+    }
+    let tilesTouched=false,debited=false;
+    try{
+      tilesTouched=true;
+      await scene.updateEmbeddedDocuments('Tile',updates);
+      if(plan){debited=true;await colony.updateEmbeddedDocuments('Item',plan.changes);}
+      await colony.update(updateInfra({links:links.map(l=>upgrade.need.some(n=>n.id===l.id)?{...l,tier:upgrade.next}:l),
+        processed:newProcessed(infra,request.id)}));
+    }catch(error){
+      let broken=false;
+      if(debited){try{await restoreResources(colony,before);}catch(err){broken=true;console.error('GENESIS network material recovery',err);}}
+      if(tilesTouched){try{await scene.updateEmbeddedDocuments('Tile',previous);}catch(err){broken=true;console.error('GENESIS network tile recovery',err);}}
+      if(broken)throw Error('Ошибка отката модернизации. GM должен сверить склад и сеть с резервной копией.');
+      throw error;
+    }
+    response=`Цепь ${NETWORK_TYPES[upgrade.type].name} улучшена до ${upgrade.next} уровня: ${upgrade.need.length} участков, ${upgrade.segments} клеток.${free?' Режим GM без списания.':''}`;
   }else if(request.action==='priority'){
     const value=Number(request.priority);
     if(!Number.isInteger(value)||value<0||value>9)throw Error('Приоритет должен быть целым числом от 0 до 9.');
@@ -138,7 +180,7 @@ async function doCommit(request){
     if(list(link.route).length!==list(link.tileIds).length)throw Error('Нарушена структура маршрута. Восстановите данные сети из резервной копии.');
     const grid=sceneGeometry(scene).grid,missing=[];
     for(let i=0;i<link.tileIds.length;i++)if(!scene.tiles.get(link.tileIds[i]))missing.push(i);
-    const fullTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:colony.id,grid,gmFree:!!link.gmFree});
+    const fullTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:colony.id,grid,gmFree:!!link.gmFree,tier:tierNumber(link.tier)});
     const data=missing.map(i=>fullTiles[i]);
     // A survivor fixing a broken line pays for replacement material. The GM's
     // no-cost restoration remains an administrative repair for accidental deletion.
@@ -175,22 +217,35 @@ export function networkContext(actor,user,networkSnapshot=null){
     const status=node?(node.operational?(node.manual?'Ручной режим':'Работает'):
       node.powerNeed&&!node.powered?'Нет питания':'Нет водоснабжения'):'Тайл требует проверки';
     return {...p,name,sceneName:game.scenes.get(p.sceneId)?.name||'Неизвестная сцена',
-      powerNeed:DEVICES[p.buildingId]?.power||0,waterNeed:DEVICES[p.buildingId]?.water||0,
-      powerOut:(DEVICES[p.buildingId]?.powerOut||0)*(1+.5*(Math.min(3,Number(p.tier)||1)-1)),
-      waterOut:(DEVICES[p.buildingId]?.waterOut||0)*(1+.5*(Math.min(3,Number(p.tier)||1)-1)),
+      powerNeed:node?.powerNeed??utilityProfile(p.buildingId,p.tier,DEVICES).power,
+       waterNeed:node?.waterNeed??utilityProfile(p.buildingId,p.tier,DEVICES).water,
+       powerOut:node?.powerOut??utilityProfile(p.buildingId,p.tier,DEVICES).powerOut,
+       waterOut:node?.waterOut??utilityProfile(p.buildingId,p.tier,DEVICES).waterOut,
       status,priority,priorityOptions:Array.from({length:10},(_,n)=>({value:n,label:`${n}${n===0?' · высший':n===9?' · низший':''}`,selected:n===priority})),
       powered:!!node?.powered,watered:!!node?.watered,working:!!node?.operational};
   });
   const buildingNames=new Map(buildings.map(b=>[b.id,b.name]));
-  const links=list(infra.links).map(l=>({
-    ...l,gmFree:!!l.gmFree,name:NETWORK_TYPES[l.type]?.name||l.type,sceneName:game.scenes.get(l.sceneId)?.name||'Неизвестная сцена',
-    from:buildingNames.get(l.fromId)||'Удалённое здание',
-    to:buildingNames.get(l.toId)||'Удалённое здание',
-    length:l.route.length,health:statuses[l.id],ok:statuses[l.id]==='ok',
-    canRepair:user.isGM&&statuses[l.id]==='missing-tile',
-    canMaintain:statuses[l.id]==='missing-tile'&&canConnect,
-    missingSegments:statuses[l.id]==='missing-tile'?list(l.tileIds).filter(id=>!game.scenes.get(l.sceneId)?.tiles?.get?.(id)).length:0,
-    canRemove:user.isGM&&statuses[l.id]==='ok'}));
+  const links=list(infra.links).map(l=>{
+    const ready=statuses[l.id]==='ok',tier=tierNumber(l.tier);
+    let upgrade=null;
+    if(ready){
+      try{upgrade=chainUpgradePlan(infra.links,l.id);
+        if(upgrade.members.some(x=>statuses[x.id]!=='ok'))upgrade=null;
+      }catch{upgrade=null;}
+    }
+    return {...l,tier,capacity:NETWORK_TYPES[l.type]?linkCapacity(l.type,tier):0,
+      gmFree:!!l.gmFree,name:NETWORK_TYPES[l.type]?.name||l.type,sceneName:game.scenes.get(l.sceneId)?.name||'Неизвестная сцена',
+      from:buildingNames.get(l.fromId)||'Удалённое здание',to:buildingNames.get(l.toId)||'Удалённое здание',
+      length:l.route.length,health:statuses[l.id],ok:ready,
+      canUpgrade:canConnect&&!!upgrade&&effectiveUnlocked(colony.system.science).has(upgrade.techId),
+      canGMUpgrade:user.isGM&&!!upgrade,
+      nextTier:upgrade?.next||0,upgradeCells:upgrade?.segments||0,
+      upgradeCosts:upgrade?Object.entries(upgrade.inputs).map(([code,n])=>`${code} ×${n}`).join(' · '):'',
+      canRepair:user.isGM&&statuses[l.id]==='missing-tile',
+      canMaintain:statuses[l.id]==='missing-tile'&&canConnect,
+      missingSegments:statuses[l.id]==='missing-tile'?list(l.tileIds).filter(id=>!game.scenes.get(l.sceneId)?.tiles?.get?.(id)).length:0,
+      canRemove:user.isGM&&ready};
+  });
   return {available:true,colonyId:colony.id,canConnect,
     isGM:user.isGM,buildings,links,totals:simulation.totals,simulation,
     types:Object.entries(NETWORK_TYPES).map(([id,def])=>({id,...def}))};

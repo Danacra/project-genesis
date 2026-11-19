@@ -24,7 +24,7 @@ test('system registers all type models and the existing game settings',()=>{
   hooks.init();
   assert.deepEqual(Object.keys(CONFIG.Actor.dataModels),['survivor','npc','colony']);
   assert.deepEqual(Object.keys(CONFIG.Item.dataModels),['material','gear','tool','component','consumable','container']);
-  assert.deepEqual(registered,[['project-genesis','worldDay'],['project-genesis','logisticsJournal'],['project-genesis','dayOperation'],['project-genesis','missionOperation']]);
+  assert.deepEqual(registered,[['project-genesis','worldDay'],['project-genesis','worldClock'],['project-genesis','logisticsJournal'],['project-genesis','dayOperation'],['project-genesis','missionOperation']]);
 });
 test('colony includes research fields but retains legacy science points/tier',()=>{
   const schema=CONFIG.Actor.dataModels.colony.defineSchema();

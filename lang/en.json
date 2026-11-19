@@ -1,1 +1,1 @@
-{"PG":{"SystemName":"PROJECT GENESIS","Survivor":"Survivor","NPC":"NPC","Colony":"Colony","Transfer":"Transfer","Day":"Day","Inventory":"Inventory","Science":"Science"}}
+{"PG":{"SystemName":"PROJECT GENESIS","Survivor":"Survivor","NPC":"NPC","Colony":"Colony","Transfer":"Transfer","Day":"Day","Inventory":"Inventory","Science":"Science"},"TYPES":{"Actor":{"survivor":"Survivor","npc":"NPC","colony":"Colony"},"Item":{"material":"Material","gear":"Gear","tool":"Tool","component":"Component","consumable":"Consumable","container":"Container"}}}

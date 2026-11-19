@@ -1,5 +1,6 @@
 import { SurvivorData,NPCData,ColonyData,MaterialData,GearData,ToolData,ComponentData,ConsumableData,ContainerData } from './module/models.mjs';
 import { GenesisActorSheet, GenesisItemSheet } from './module/sheets.mjs';
+import {initializeSheetLiveUpdates} from './module/sheet-refresh.mjs';
 import { initializeLogistics, advanceDay } from './module/logistics.mjs';
 import { ABILITIES, SKILLS } from './module/rules.mjs';
 import { initializeResearch, requestResearch, TECHNOLOGIES } from './module/research.mjs';
@@ -18,7 +19,9 @@ import {initializeMission,requestMission,missionStage} from './module/mission.mj
 import {startResourcePlacement,stopResourcePlacement} from './module/crew-placement.mjs';
 import {initializeBuildingInteractions,enterRoom,exitRoom,openStationCraft} from './module/building-interactions.mjs';
 import {initializeInteriorLighting,toggleRoomLighting} from './module/interior-lighting.mjs';
+import {initializeInteriorAppearance} from './module/interior-decor-163.mjs';
 import {upgradeDefaultBuildingTiles} from './module/building-roof.mjs';
+import {initializeWorldClock} from './module/world-clock-164.mjs';
 const ID = 'project-genesis';
 Hooks.once('init',()=>{
   CONFIG.Actor.dataModels.survivor=SurvivorData;
@@ -34,6 +37,7 @@ Hooks.once('init',()=>{
   sheetConfig.registerSheet(Actor,ID,GenesisActorSheet,{types:['survivor','npc','colony'],makeDefault:true,label:'PROJECT GENESIS — лист'});
   sheetConfig.registerSheet(Item,ID,GenesisItemSheet,{types:['material','gear','tool','component','consumable','container'],makeDefault:true,label:'PROJECT GENESIS — предмет'});
   game.settings.register(ID,'worldDay',{name:'День экспедиции',scope:'world',config:false,type:Number,default:1});
+  game.settings.register(ID,'worldClock',{name:'Время экспедиции',scope:'world',config:false,type:Object,default:{minute:480,speed:1,paused:false,pending:null,pulse:0}});
   game.settings.register(ID,'logisticsJournal',{name:'Журнал логистики',scope:'world',config:false,type:Object,default:{entries:[],processed:[]}});
   game.settings.register(ID,'dayOperation',{name:'Незавершённый переход суток',scope:'world',config:false,type:Object,default:{}});
   game.settings.register(ID,'missionOperation',{name:'Незавершённая сборка корабля',scope:'world',config:false,type:Object,default:{}});
@@ -51,7 +55,10 @@ Hooks.once('ready',()=>{
   initializeRest();
   initializeMission();
   initializeBuildingInteractions();
+  initializeSheetLiveUpdates();
   initializeInteriorLighting();
+  initializeInteriorAppearance();
+  initializeWorldClock();
   if(game.user?.isGM && game.actors?.filter)void upgradeDefaultBuildingTiles().catch(error=>console.error('PROJECT GENESIS: artwork migration',error));
   game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement,planetZones:PLANET_ZONES,weatherForDay,requestRest,requestMission,missionStage,enterRoom,exitRoom,openStationCraft,toggleRoomLighting};
   console.info(`PROJECT GENESIS v${game.system?.version || "development"} ready`);

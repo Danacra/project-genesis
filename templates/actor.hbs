@@ -2,7 +2,7 @@
   <div class="genesis-banner">
     <div class="genesis-portrait"><img src="{{actor.img}}" data-action="editImage" data-edit="img" alt="" title="Изменить портрет"></div>
     <div class="genesis-heading"><span class="genesis-kicker">PROJECT GENESIS / EXPEDITION ARCHIVE</span>
-      <h1>{{actor.name}}</h1><div class="genesis-muted">{{#if isColony}}Колония и общий склад{{else}}Карточка выжившего · {{actor.system.specialization}}{{/if}}</div></div>
+      <h1>{{actor.name}}</h1><div class="genesis-muted">{{#if isColony}}Колония и общий склад{{else}}Карточка выжившего · {{specialization.name}}{{/if}}</div></div>
     <div class="genesis-header-controls">
       <label class="genesis-header-switcher">Раздел
         <select data-genesis-quick-nav aria-label="Перейти к разделу листа">
@@ -23,23 +23,38 @@
       </label>
       <button type="button" class="genesis-header-inventory" data-genesis-open-tab="inventory">{{#if isColony}}Общий склад{{else}}Инвентарь{{/if}}</button>
     </div>
-    <div class="genesis-day"><span>ДЕНЬ</span><strong>{{worldDay}}</strong>{{#if isGM}}<button type="button" data-genesis-action="day" title="Потратить запасы и перейти к следующим суткам">+1 сутки</button>{{/if}}</div>
+    <div class="genesis-day genesis-clock-panel" data-genesis-clock>
+      <span class="genesis-clock-caption">ДЕНЬ <b data-genesis-clock-day>{{worldDay}}</b></span>
+      <strong data-genesis-clock-time>{{clock.time}}</strong>
+      <small data-genesis-clock-state>{{#if clock.paused}}Пауза{{else}}Ход времени · ×{{clock.speed}}{{/if}}</small>
+      {{#if clock.canControl}}<div class="genesis-clock-controls" aria-label="Управление игровыми часами">
+        <button type="button" data-genesis-clock-toggle aria-pressed="{{#unless clock.paused}}true{{else}}false{{/unless}}">{{#if clock.paused}}▶ Пуск{{else}}❚❚ Пауза{{/if}}</button>
+        <label>Скорость<select data-genesis-clock-speed aria-label="Скорость игровых часов">{{#each clock.choices}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}</select></label>
+        <button type="button" data-genesis-clock-hour title="Перейти на один игровой час вперёд">+1 ч</button>
+        <button type="button" data-genesis-action="day" title="Ручной переход суток и списание запасов">+1 день</button>
+      </div>{{/if}}
+    </div>
   </div>
+  <div class="genesis-workspace-row">
+    <aside class="genesis-sidebar-shell" data-genesis-sidebar aria-label="Навигация PROJECT GENESIS">
+      <div class="genesis-sidebar-head"><strong>РАЗДЕЛЫ</strong><button type="button" data-genesis-sidebar-toggle title="Закрепить боковую панель" aria-label="Закрепить боковую панель" aria-pressed="false"><i class="fa-solid fa-thumbtack" aria-hidden="true"></i></button></div>
   <div class="genesis-nav genesis-tabbar" role="tablist" aria-label="Разделы PROJECT GENESIS" data-genesis-navigation>
-    <button type="button" data-genesis-tab="overview" role="tab">Обзор</button>
-    <button type="button" data-genesis-tab="inventory" role="tab">Инвентарь</button>
-    <button type="button" data-genesis-tab="containers" role="tab">Контейнеры</button>
-    <button type="button" data-genesis-tab="research" role="tab">Исследования</button>
-    <button type="button" data-genesis-tab="blueprints" role="tab">Чертежи</button>
-    <button type="button" data-genesis-tab="production" role="tab">Производство</button>
-    <button type="button" data-genesis-tab="construction" role="tab">Строительство</button>
-    <button type="button" data-genesis-tab="networks" role="tab">Энергия и сети</button>
-    <button type="button" data-genesis-tab="planet" role="tab">Планета</button>
-    <button type="button" data-genesis-tab="crew" role="tab">Экипаж и логистика</button>
-    <button type="button" data-genesis-tab="mission" role="tab">Корабль</button>
-    <button type="button" data-genesis-tab="history" role="tab">Журнал операций</button>
-    <button type="button" data-genesis-tab="library" role="tab">Библиотека</button>
+    <button type="button" data-genesis-tab="overview" role="tab" title="Обзор" aria-label="Обзор"><i class="fa-solid fa-house" aria-hidden="true"></i><span class="genesis-nav-label">Обзор</span></button>
+    <button type="button" data-genesis-tab="inventory" role="tab" title="Инвентарь" aria-label="Инвентарь"><i class="fa-solid fa-suitcase" aria-hidden="true"></i><span class="genesis-nav-label">Инвентарь</span></button>
+    <button type="button" data-genesis-tab="containers" role="tab" title="Контейнеры" aria-label="Контейнеры"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i><span class="genesis-nav-label">Контейнеры</span></button>
+    <button type="button" data-genesis-tab="research" role="tab" title="Исследования" aria-label="Исследования"><i class="fa-solid fa-flask" aria-hidden="true"></i><span class="genesis-nav-label">Исследования</span></button>
+    <button type="button" data-genesis-tab="blueprints" role="tab" title="Чертежи" aria-label="Чертежи"><i class="fa-solid fa-book-open" aria-hidden="true"></i><span class="genesis-nav-label">Чертежи</span></button>
+    <button type="button" data-genesis-tab="production" role="tab" title="Производство" aria-label="Производство"><i class="fa-solid fa-gears" aria-hidden="true"></i><span class="genesis-nav-label">Производство</span></button>
+    <button type="button" data-genesis-tab="construction" role="tab" title="Строительство" aria-label="Строительство"><i class="fa-solid fa-hammer" aria-hidden="true"></i><span class="genesis-nav-label">Строительство</span></button>
+    <button type="button" data-genesis-tab="networks" role="tab" title="Энергия и сети" aria-label="Энергия и сети"><i class="fa-solid fa-bolt" aria-hidden="true"></i><span class="genesis-nav-label">Энергия и сети</span></button>
+    <button type="button" data-genesis-tab="planet" role="tab" title="Планета" aria-label="Планета"><i class="fa-solid fa-globe" aria-hidden="true"></i><span class="genesis-nav-label">Планета</span></button>
+    <button type="button" data-genesis-tab="crew" role="tab" title="Экипаж и логистика" aria-label="Экипаж и логистика"><i class="fa-solid fa-users" aria-hidden="true"></i><span class="genesis-nav-label">Экипаж и логистика</span></button>
+    <button type="button" data-genesis-tab="mission" role="tab" title="Корабль" aria-label="Корабль"><i class="fa-solid fa-rocket" aria-hidden="true"></i><span class="genesis-nav-label">Корабль</span></button>
+    <button type="button" data-genesis-tab="history" role="tab" title="Журнал операций" aria-label="Журнал операций"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span class="genesis-nav-label">Журнал операций</span></button>
+    <button type="button" data-genesis-tab="library" role="tab" title="Библиотека" aria-label="Библиотека"><i class="fa-solid fa-book" aria-hidden="true"></i><span class="genesis-nav-label">Библиотека</span></button>
   </div>
+    </aside>
+    <div class="genesis-workspace-body">
   <div class="genesis-content" data-genesis-page="overview">
     <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="start">? С чего начать</button></div>
     {{#if isColony}}
@@ -62,7 +77,18 @@
       <div class="genesis-panel"><h2>Состояние экспедиции</h2><div class="genesis-vitals">
       {{#each vitals}}<label class="genesis-vital"><span>{{label}}</span><progress value="{{value}}" max="100"></progress><input type="number" data-genesis-field="survival.{{key}}" value="{{value}}" min="0" max="100" step="1" {{#unless ../editable}}disabled{{/unless}}></label>{{/each}}
       </div><p class="genesis-footnote">Голод, жажда и усталость: 0 — лучшее состояние, 100 — критическое. Здоровье и кислород: 100 — максимум.</p></div>
-      {{#if isSurvivor}}<div class="genesis-panel"><h2>Отдых и восстановление</h2>
+      {{#if isSurvivor}}<div class="genesis-panel genesis-specialization-panel">
+        <h2>Специализация персонажа</h2>
+        <div class="genesis-specialization-status"><span>{{#if specialization.hasSpecialization}}ТЕКУЩАЯ СПЕЦИАЛИЗАЦИЯ{{else}}СПЕЦИАЛИЗАЦИЯ ЕЩЁ НЕ ПОЛУЧЕНА{{/if}}</span><strong>{{specialization.name}}</strong></div>
+        <p class="genesis-muted">Определяется автоматически: основная характеристика не ниже 6, профильный навык не ниже 4. Пока специализации только информационные — бонусы появятся в будущих обновлениях.</p>
+        <div class="genesis-specialization-grid">{{#each specialization.all}}
+          <article class="genesis-specialization-item {{#if ready}}is-ready{{/if}}">
+            <div><strong>{{name}}{{#if ready}} · ✓{{/if}}</strong><small>{{abilityName}} {{ability}}/6 · {{skillName}} {{skill}}/4</small></div>
+            <progress max="100" value="{{progress}}" aria-label="Прогресс специализации {{name}}"></progress>
+            <p>{{future}}</p>
+          </article>{{/each}}</div>
+      </div>
+      <div class="genesis-panel"><h2>Отдых и восстановление</h2>
         <p class="genesis-muted">Отдых доступен один раз за игровые сутки. Новые рабочие задания заблокированы при усталости от 85.</p>
         <p>Усталость: <strong>{{rest.fatigue}} / 100</strong> · {{#if rest.shelter}}На базе есть жилой модуль{{else}}Жилой модуль ещё не построен{{/if}}</p>
         {{#if rest.used}}<p class="genesis-tech-done">Сегодня персонаж уже отдыхал.</p>{{/if}}
@@ -72,7 +98,7 @@
           <button type="button" class="genesis-primary" data-genesis-action="rest" data-rest-kind="shelter" {{#unless rest.canAct}}disabled{{/unless}} {{#unless rest.shelter}}disabled{{/unless}} {{#if rest.used}}disabled{{/if}} {{#if rest.busy}}disabled{{/if}}>Сон в жилом модуле (−40 усталости)</button>
         </div>
       </div>{{/if}}
-      <div class="genesis-panel"><h2>Профиль</h2><div class="genesis-form-grid"><label>Специализация<input data-genesis-field="specialization" value="{{actor.system.specialization}}" {{#unless editable}}disabled{{/unless}}></label></div>
+      <div class="genesis-panel"><h2>Профиль</h2><div class="genesis-profile-specialization"><span>Автоматическая специализация</span><strong>{{specialization.name}}</strong><small>Повышайте характеристики и навыки, чтобы открыть профиль. Записанное ранее значение сохраняется в данных персонажа.</small></div>
         <label>Биография<textarea data-genesis-field="biography" rows="3" {{#unless editable}}disabled{{/unless}}>{{actor.system.biography}}</textarea></label></div>
     {{/if}}
     <div class="genesis-panel genesis-inventory-summary">
@@ -120,6 +146,13 @@
         {{/each}}
       </div>
       <div data-genesis-research-main>
+      <div class="genesis-era-rail" role="group" aria-label="Эпохи экспедиции" data-genesis-era-nav>
+        {{#each research.eras}}
+          <button type="button" data-genesis-era-jump="{{tier}}" title="Перейти к эпохе {{label}}">
+            <span class="genesis-era-number">НАУЧНАЯ ЭПОХА</span><strong>{{label}}</strong>
+          </button>
+        {{/each}}
+      </div>
       <div class="genesis-tech-toolbar">
         <div class="genesis-tech-filters"><button type="button" data-genesis-tech-filter="all" class="active">Все направления</button>
           {{#each research.branches}}<button type="button" data-genesis-tech-filter="{{id}}">{{label}}</button>{{/each}}</div>
@@ -127,17 +160,19 @@
           <button type="button" data-genesis-action="zoom-out" title="Уменьшить">−</button>
           <span class="genesis-zoom" data-genesis-zoom-level>100%</span>
           <button type="button" data-genesis-action="zoom-in" title="Увеличить">+</button>
-          <button type="button" data-genesis-action="zoom-reset" title="Исходный масштаб">↺</button></div>
+          <button type="button" data-genesis-action="zoom-reset" title="Исходный масштаб">↺</button>
+          <button type="button" data-genesis-era-home title="Вернуться в начало дерева">К началу</button></div>
+          <p class="genesis-tech-controls-hint">Перетаскивайте поле мышью, переходите по эпохам, выбирайте технологии. Зажмите Shift и прокрутите колесо для горизонтального перемещения.</p>
       </div>
       <div class="genesis-tech-layout">
         <div class="genesis-tech-viewport" role="region" aria-label="Интерактивное дерево открытий" tabindex="0">
           <div class="genesis-tech-board" data-genesis-tech-board>
             <svg data-genesis-tech-links class="genesis-tech-links" aria-hidden="true"></svg>
             {{#each research.eras}}
-            <div class="genesis-tech-era"><h3>{{label}}</h3>
+            <div class="genesis-tech-era" data-genesis-era="{{tier}}"><h3><span class="genesis-era-head-mark">◇</span> {{label}}</h3>
               {{#each nodes}}
               <button type="button" class="genesis-tech-card {{#if isGroup}}genesis-tech-group{{/if}} {{#if unlocked}}is-unlocked{{else}}{{#unless prerequisitesReady}}is-locked{{/unless}}{{/if}}" data-genesis-tech-card="{{id}}" data-genesis-tech-branch="{{branch}}" aria-label="{{name}}">
-                <span class="genesis-tech-card-label">{{branchLabel}}</span><strong>{{name}}</strong>
+                <span class="genesis-tech-card-label"><span class="genesis-tech-branch-glyph" aria-hidden="true"></span> {{branchLabel}}</span><strong>{{name}}</strong>
                 <span class="genesis-tech-card-status">{{statusLabel}}</span>
                 <span class="genesis-tech-progress"><span style="width:{{percent}}%"></span></span>
               </button>
@@ -147,6 +182,7 @@
           </div>
         </div>
         <aside class="genesis-tech-inspector" aria-label="Подробности исследования">
+          <div class="genesis-tech-inspector-heading"><span>НАУЧНОЕ ДОСЬЕ</span><small>Выберите технологию на схеме</small></div>
           <p class="genesis-muted" data-genesis-tech-empty hidden>По заданному фильтру технологии не найдены.</p>
           {{#each research.details}}
           <section data-genesis-tech-detail="{{id}}" hidden>
@@ -187,6 +223,11 @@
           </section>
           {{/each}}
         </aside>
+      </div>
+      <div class="genesis-tech-legend" aria-label="Условные обозначения">
+        <span><i class="is-unlocked"></i> Изучено</span>
+        <span><i class="is-ready"></i> Доступно</span>
+        <span><i class="is-locked"></i> Требует открытий</span>
       </div>
       </div><!-- /data-genesis-research-main -->
       <div class="genesis-research-subtree" data-genesis-research-subtree hidden>
@@ -260,9 +301,9 @@
   <div class="genesis-content" data-genesis-page="blueprints" hidden>
     <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="blueprints">? Как работают чертежи</button></div>
     {{#if research.available}}
-      <div class="genesis-toolbar"><div><h2>Каталог чертежей</h2><p class="genesis-muted">Открытые чертежи можно изготовить в разделе «Производство», если на базе есть нужный станок и ресурсы.</p></div></div>
+      <div class="genesis-toolbar"><div><h2>Каталог чертежей</h2><p class="genesis-muted">Открытые чертежи можно изготовить в разделе «Производство», если на базе есть нужный станок и ресурсы.</p>{{#if isGM}}<p class="genesis-gm-note">GM видит все чертежи. Неизученные рецепты не открываются игрокам и не обходят условия производства.</p>{{/if}}</div></div>
       <div class="genesis-recipe-grid">{{#each research.recipes}}
-        <article class="genesis-recipe {{#unless unlocked}}is-locked{{/unless}}"><span>{{#if unlocked}}✓ ДОСТУПЕН{{else}}◇ НЕИЗВЕСТНО{{/if}}</span><strong>{{name}}</strong><small>{{techName}}</small></article>
+        <article class="genesis-recipe {{#unless unlocked}}{{#unless ../isGM}}is-locked{{/unless}}{{/unless}}"><span>{{#if unlocked}}✓ ИЗУЧЕНО{{else}}{{#if ../isGM}}◇ ВИДНО GM · НЕ ИЗУЧЕНО{{else}}◇ НЕИЗВЕСТНО{{/if}}{{/if}}</span><strong>{{name}}</strong><small>{{techName}}</small></article>
       {{/each}}</div>
     {{else}}<p>Сначала создайте колонию.</p>{{/if}}
   </div>
@@ -285,8 +326,8 @@
       {{#if hiddenForPlayer}}
       <article class="genesis-product-card genesis-discovery-secret" aria-label="Неизвестный рецепт"><div class="genesis-secret-icon" aria-hidden="true">?</div><h3>???</h3><p>Чертёж ещё не открыт</p></article>
       {{else}}
-      <article class="genesis-product-card {{#unless unlocked}}is-locked{{/unless}}">
-        <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ИЗУЧЕНО{{else}}◇ ЗАКРЫТО{{/if}}</span><span class="genesis-product-duration">{{days}} сут./партия</span></div>
+      <article class="genesis-product-card {{#unless unlocked}}{{#unless ../isGM}}is-locked{{/unless}}{{/unless}}">
+        <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ИЗУЧЕНО{{else}}{{#if ../isGM}}◇ ЧЕРТЁЖ GM · НЕ ИЗУЧЕН{{else}}◇ ЗАКРЫТО{{/if}}{{/if}}</span><span class="genesis-product-duration">{{days}} сут./партия</span></div>
         <h3>{{name}}</h3><p class="genesis-product-desc">{{description}}</p>
         <div class="genesis-production-meta"><span>СТАНЦИЯ</span><strong>{{stationName}}{{#unless stationReady}} · отсутствует{{/unless}}</strong></div>
         <div class="genesis-production-meta"><span>ВЫХОД</span><strong>{{outputQuantity}} шт./партия</strong></div>
@@ -320,10 +361,15 @@
           {{#if canRepair}}<button type="button" class="genesis-map-repair" data-genesis-action="repair-map" data-placement-id="{{id}}">Восстановить тайл (GM)</button>{{/if}}
           {{#if isFinished}}{{#if isRoom}}<button type="button" class="genesis-primary" data-genesis-action="enter-room" data-placement-id="{{id}}">Войти внутрь</button>{{/if}}
             {{#if isStation}}<button type="button" class="genesis-primary" data-genesis-action="station-craft" data-placement-id="{{id}}">Крафт</button>{{/if}}{{/if}}
-          {{#if nextTier}}<span class="genesis-tier-badge" title="Уровень постройки">Уровень {{tier}} / 3 {{tierMark}}</span>
+          {{#if nextTier}}
+          <span class="genesis-tier-badge" title="Уровень постройки">Уровень {{tier}} / 3 {{tierMark}}</span>
+           <span class="genesis-tier-info" title="Площадь и энергопотребление">{{footprintLabel}} кл. · ⚡ {{tierPower}} · ◉ {{tierWater}}{{#if tierPowerOut}} · +⚡ {{tierPowerOut}}{{/if}}</span>
+           {{#if canSyncSize}}<button type="button" data-genesis-action="industry" data-industry-action="resize-building" data-placement-id="{{id}}">GM · подогнать размер под уровень</button>{{/if}}
           {{#if canUpgrade}}<button type="button" data-genesis-action="industry" data-industry-action="upgrade-building" data-placement-id="{{id}}" title="{{upgradeCost}}">Улучшить до {{nextTier}} · {{upgradeCost}}</button>{{/if}}
           {{#if canGMUpgrade}}<button type="button" data-genesis-action="industry" data-industry-action="upgrade-building" data-gm-free="true" data-placement-id="{{id}}">Улучшить до {{nextTier}} (GM бесплатно)</button>{{/if}}
-          {{else}}<span class="genesis-tier-badge">Уровень 3 / 3 ◆◆◆</span>{{/if}}
+          {{else}}<span class="genesis-tier-badge">Уровень 3 / 3 ◆◆◆</span>
+           <span class="genesis-tier-info">{{footprintLabel}} кл. · ⚡ {{tierPower}} · ◉ {{tierWater}}{{#if tierPowerOut}} · +⚡ {{tierPowerOut}}{{/if}}</span>
+           {{#if canSyncSize}}<button type="button" data-genesis-action="industry" data-industry-action="resize-building" data-placement-id="{{id}}">GM · подогнать размер под уровень</button>{{/if}}{{/if}}
           {{#if canDismantle}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="salvage" data-placement-id="{{id}}">Разобрать (50%)</button>{{/if}}
           {{#if canErase}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="erase" data-placement-id="{{id}}" class="genesis-danger">Удалить (GM)</button>{{/if}}
           {{#if canCancelSite}}<button type="button" data-genesis-action="industry" data-industry-action="cancel" data-queue="construction" data-job-id="{{jobId}}" class="genesis-danger">Отменить стройплощадку (GM)</button>{{/if}}
@@ -336,7 +382,7 @@
         <article class="genesis-product-card genesis-building-card genesis-discovery-secret" aria-label="Неизвестное сооружение"><div class="genesis-secret-icon" aria-hidden="true">?</div><h3>???</h3><p>Сооружение пока не открыто</p></article>
         {{else}}
         <article class="genesis-product-card genesis-building-card {{#unless unlocked}}is-locked{{/unless}}">
-          <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ДОСТУПНО{{else}}◇ НУЖНО ИССЛЕДОВАНИЕ{{/if}}</span><span class="genesis-product-duration">{{days}} сут.</span></div>
+          <div class="genesis-product-top"><span class="genesis-product-state">{{#if unlocked}}● ДОСТУПНО{{else}}{{#if ../isGM}}◇ ВИДНО GM · НЕ ИЗУЧЕНО{{else}}◇ НУЖНО ИССЛЕДОВАНИЕ{{/if}}{{/if}}</span><span class="genesis-product-duration">{{days}} сут.</span></div>
           <h3>{{name}}</h3><p class="genesis-product-desc">{{description}}</p>
           <div class="genesis-production-meta"><span>ПОСТРОЕНО</span><strong>{{built}} / {{max}} (обычный лимит){{#if underConstruction}} · строится {{underConstruction}}{{/if}}</strong></div>
           <div class="genesis-material-grid">{{#each materials}}<div class="genesis-material-chip {{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></div>{{/each}}</div>
@@ -375,7 +421,7 @@
     </div>
     <div class="genesis-panel"><h3>Подключённые здания</h3><p class="genesis-muted">Старые мастерские могут работать вручную; электронные лаборатории и поздние объекты требуют питания. Водная станция выдаёт воду только при наличии энергии.</p>
       <div class="genesis-network-buildings">{{#each networks.buildings}}
-        <article class="genesis-network-device {{#unless working}}is-offline{{/unless}}"><div><strong>{{name}}</strong><small>{{sceneName}} · {{status}}</small></div>
+        <article class="genesis-network-device {{#unless working}}is-offline{{/unless}}"><div><strong>{{name}} · {{tier}} ур.</strong><small>{{sceneName}} · {{status}}</small></div>
           <div class="genesis-network-device-meta"><span>⚡ {{powerNeed}} {{#if powerOut}}/ +{{powerOut}}{{/if}}</span><span>◉ {{waterNeed}} {{#if waterOut}}/ +{{waterOut}}{{/if}}</span></div>
           {{#if ../networks.canConnect}}
           <label class="genesis-network-priority-label">Приоритет
@@ -388,12 +434,14 @@
         </article>
       {{else}}<p class="genesis-muted">Нет готовых построек на локальных картах. Разместите здания через вкладку «Строительство».</p>{{/each}}</div>
     </div>
-    <div class="genesis-panel"><h3>Кабели и трубопроводы</h3>
+    <div class="genesis-panel"><h3>Кабели и трубопроводы</h3><p class="genesis-muted">I ур. — базовая пропускная способность, II ур. — усиленные линии, III ур. — промышленные линии. Улучшается целая связанная цепь, а не отдельный кабель.</p>
       <div class="genesis-network-links">{{#each networks.links}}
         <article class="genesis-network-link"><div><strong>{{name}} · {{from}} → {{to}} {{#if gmFree}}· GM (бесплатно){{/if}}</strong>
-          <small>{{sceneName}} · {{length}} клеток · {{#if ok}}Исправно{{else}}⚠ {{health}}{{/if}}</small></div>
+          <small>{{sceneName}} · {{length}} клеток · Уровень {{tier}} · Лимит сегмента: {{capacity}} ед. · {{#if ok}}Исправно{{else}}⚠ {{health}}{{/if}}{{#if nextTier}} · Стоимость улучшения цепи: {{upgradeCosts}}{{/if}}</small></div>
           {{#if canMaintain}}<button type="button" data-genesis-action="network" data-network-action="maintain" data-link-id="{{id}}">Ремонт · {{missingSegments}} сегм.</button>{{/if}}
           {{#if canRepair}}<button type="button" data-genesis-action="network" data-network-action="repair" data-link-id="{{id}}">Восстановить бесплатно (GM)</button>{{/if}}
+           {{#if canUpgrade}}<button type="button" class="genesis-primary" data-genesis-action="network" data-network-action="upgrade-chain" data-link-id="{{id}}" title="Улучшает всю соединённую цепь">Улучшить всю цепь до {{nextTier}} ур.</button>{{/if}}
+           {{#if canGMUpgrade}}<button type="button" data-genesis-action="network" data-network-action="gm-upgrade-chain" data-link-id="{{id}}">GM · цепь до {{nextTier}} ур. бесплатно</button>{{/if}}
           {{#if canRemove}}<button type="button" data-genesis-action="network" data-network-action="disconnect" data-link-id="{{id}}">Демонтировать (GM)</button>{{/if}}
         </article>
       {{else}}<p class="genesis-muted">Сетей пока нет. Постройте генератор и потребителей на одной сцене, затем соедините их.</p>{{/each}}</div>
@@ -522,6 +570,8 @@
           </article>
         {{/each}}
       </div>
+    </div>
+  </div>
     </div>
   </div>
   <footer class="genesis-footer">PG / SYSTEM {{systemVersion}} <span>EXPLORE · RESEARCH · REBUILD</span></footer>

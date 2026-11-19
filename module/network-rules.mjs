@@ -2,6 +2,8 @@
  * Units are game abstractions, not real engineering measurements.
  */
 import {sceneGeometry, overlaps} from './map-rules.mjs';
+import {tierNumber,utilityProfile} from './tier-rules-162.mjs';
+import {allocateUtility} from './utility-flow-162.mjs';
 export const NETWORK_TYPES=Object.freeze({power:{name:'Электрокабель',material:'copper',per:3,icon:'⚡'},water:{name:'Водопровод',material:'alloy',per:3,icon:'◉'}});
 export const NETWORK_LIMITS=Object.freeze({maxLinks:60,maxRoute:100,maxTiles:1200,maxSceneCells:30000});
 export const DEVICES=Object.freeze({
@@ -158,13 +160,13 @@ export function validateNetworkLink(link,scene){
   if(!NETWORK_TYPES[link.type])return 'invalid-type';
   if(!list(link.route).length||link.route.length!==list(link.tileIds).length)return 'missing-tile';
   let g;try{g=cellsInBounds(scene);}catch{return 'bad-scene';}
-  const tiles=scene.tiles,expectedTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:link.colonyId,grid:g.grid,gmFree:!!link.gmFree});
+  const tiles=scene.tiles,expectedTiles=asNetworkTiles(link.type,link.route,{networkId:link.id,colonyId:link.colonyId,grid:g.grid,gmFree:!!link.gmFree,tier:tierNumber(link.tier)});
   for(let i=0;i<link.tileIds.length;i++){
     const tile=tiles?.get?.(link.tileIds[i])||[...(tiles||[])].find(t=>t.id===link.tileIds[i]);
     if(!tile)return 'missing-tile';
     const flag=tile.flags?.['project-genesis'];
     if(flag?.networkId!==link.id||flag?.colonyId!==link.colonyId||flag?.networkType!==link.type||
-       !!flag?.gmFree!==!!link.gmFree)return 'foreign-tile';
+       !!flag?.gmFree!==!!link.gmFree||tierNumber(flag?.tier)!==tierNumber(link.tier))return 'foreign-tile';
     const expected=expectedTiles[i];
     if(Math.abs(Number(tile.rotation??0)-expected.rotation)>0.01||
        tile.texture?.src!==expected.texture.src||
@@ -176,7 +178,7 @@ export function validateNetworkLink(link,scene){
 /** Tile images are rotated to follow cable/pipe path direction; corners are
  * drawn with a separate elbow texture, and single-cell routes get a junction.
  */
-export function asNetworkTiles(type,route,{networkId,colonyId,grid,gmFree=false}){
+export function asNetworkTiles(type,route,{networkId,colonyId,grid,gmFree=false,tier=1}){
   if(!NETWORK_TYPES[type])throw Error('Неизвестный тип сети.');
   const direction=(a,b)=>({x:Math.sign(b.x-a.x),y:Math.sign(b.y-a.y)});
   const makeTile=(cell,index)=>{
@@ -192,59 +194,54 @@ export function asNetworkTiles(type,route,{networkId,colonyId,grid,gmFree=false}
       rotation=up&&right?0:right&&down?90:down&&left?180:left&&up?270:0;
     }else if(dirs[0]?.x)rotation=90;
     return {x:cell.x,y:cell.y,width:grid,height:grid,rotation,alpha:0.92,hidden:false,locked:true,
-      texture:{src:`systems/project-genesis/assets/networks/${type}-${part}.svg`},
-      flags:{'project-genesis':{networkId,colonyId,networkType:type,index,gmFree:!!gmFree}}};
+      texture:{src:`systems/project-genesis/assets/networks/${type}-${part}${tierNumber(tier)>1?'-t'+tierNumber(tier):''}.svg`},
+       flags:{'project-genesis':{networkId,colonyId,networkType:type,index,gmFree:!!gmFree,tier:tierNumber(tier)}}};
   };
   return route.map(makeTile);
 }
-/** Graph traversal keeps independent colonies and Scenes isolated; power is
- * distributed first, then powered water sources produce water for their graphs.
- */
+/** Per-segment capacity; supply is distributed in consumer priority order.
+ * Unconnected or under-capacity buildings cannot borrow energy from other graphs. */
 export function simulateNetworks(placements,links,{linkStatuses={},priorities={},interiorLoads={}}={}){
   const active=list(placements).filter(p=>p.status==='finished'&&DEVICES[p.buildingId]);
-  const nodes=new Map(active.map(p=>[p.id,{id:p.id,buildingId:p.buildingId,sceneId:p.sceneId,tier:Number(p.tier)||1,
-    powered:false,watered:false,powerNeed:(DEVICES[p.buildingId].power||0)+(interiorLoads[p.id]||0),
-    waterNeed:DEVICES[p.buildingId].water||0,operational:false}]));
+  const nodes=new Map(active.map(p=>{
+    const tier=tierNumber(p.tier),profile=utilityProfile(p.buildingId,tier,DEVICES,interiorLoads[p.id]||0);
+    return [p.id,{id:p.id,buildingId:p.buildingId,sceneId:p.sceneId,tier,
+      powered:false,watered:false,power:profile.power,water:profile.water,
+      powerNeed:profile.power,waterNeed:profile.water,powerOut:profile.powerOut,waterOut:profile.waterOut,
+      optionalPower:profile.optionalPower,optionalWater:profile.optionalWater,
+      operational:false,manual:false,
+      priority:Number.isInteger(priorities[p.id])?priorities[p.id]:profile.priority}];
+  }));
   const valid=list(links).filter(l=>NETWORK_TYPES[l.type]&&nodes.has(l.fromId)&&nodes.has(l.toId)&&
     nodes.get(l.fromId).sceneId===nodes.get(l.toId).sceneId&&nodes.get(l.fromId).sceneId===l.sceneId&&linkStatuses[l.id]!=='invalid');
+  const byType={power:valid.filter(l=>l.type==='power'),water:valid.filter(l=>l.type==='water')};
   const totals={power:{supply:0,demand:0,served:0,networks:0},water:{supply:0,demand:0,served:0,networks:0}};
-  const byType={power:[],water:[]};
-  for(const l of valid)byType[l.type].push(l);
-  function apply(type){
-    const visited=new Set(),adj=new Map([...nodes.keys()].map(id=>[id,new Set()]));
-    for(const l of byType[type]){adj.get(l.fromId).add(l.toId);adj.get(l.toId).add(l.fromId);}
+  for(const type of ['power','water']){
+    const allocated=allocateUtility(type,[...nodes.values()],byType[type]);
     for(const node of nodes.values()){
-      if(visited.has(node.id))continue;
-      const stack=[node.id],component=[];visited.add(node.id);
-      while(stack.length){const id=stack.pop();component.push(nodes.get(id));for(const target of adj.get(id))if(!visited.has(target)){visited.add(target);stack.push(target);}}
-      const devices=component.map(n=>({node:n,config:DEVICES[n.buildingId]}));
-      // A water station requires an actually powered electrical connection.
-      const supply=devices.reduce((sum,{node,config})=>sum+(type==='power'?(config.powerOut||0)*(1+0.5*Math.max(0,Math.min(3,Number(node.tier)||1)-1)):
-        node.powered?(config.waterOut||0)*(1+0.5*Math.max(0,Math.min(3,Number(node.tier)||1)-1)):0),0);
-      const demand=devices.reduce((sum,{node,config})=>sum+(type==='power'?node.powerNeed:config.water||0),0);
-      let available=supply,served=0;
-      const sorted=devices.filter(({node,config})=>(type==='power'?node.powerNeed:config.water)>0)
-        .sort((a,b)=>(Number.isInteger(priorities[a.node.id])?priorities[a.node.id]:a.config.priority??9)-
-          (Number.isInteger(priorities[b.node.id])?priorities[b.node.id]:b.config.priority??9)||a.node.id.localeCompare(b.node.id));
-      for(const {node,config}of sorted){const need=type==='power'?node.powerNeed:config.water;
-        const ok=available>=need;
-        if(ok){available-=need;served+=need;}
-        if(type==='power')node.powered=ok;else node.watered=ok;
-      }
-      // Generation stations and buildings with no need for this utility.
-      for(const {node,config}of devices){if(type==='power'&&!node.powerNeed)node.powered=true;
-        if(type==='water'&&!config.water)node.watered=true;}
-      totals[type].supply+=supply;totals[type].demand+=demand;totals[type].served+=served;
-      if(component.length>1)totals[type].networks++;
+      const ok=(type==='power'?node.power:node.water)===0||allocated.served.has(node.id);
+      if(type==='power')node.powered=ok;else node.watered=ok;
     }
+    totals[type].supply=allocated.produced;
+    totals[type].demand=allocated.demand;
+    totals[type].served=allocated.delivered;
+    // Count independently wired groups for the existing network summary.
+    const graph=new Map([...nodes.keys()].map(id=>[id,new Set()]));
+    for(const l of byType[type]){graph.get(l.fromId).add(l.toId);graph.get(l.toId).add(l.fromId);}
+    const visited=new Set();let groups=0;
+    for(const [id,neighbors] of graph){
+      if(!neighbors.size||visited.has(id))continue;
+      groups++;const stack=[id];visited.add(id);
+      while(stack.length){for(const other of graph.get(stack.pop()))if(!visited.has(other)){
+        visited.add(other);stack.push(other);
+      }}
+    }
+    totals[type].networks=groups;
   }
-  apply('power');apply('water');
-  for(const node of nodes.values()){
-    const config=DEVICES[node.buildingId];
-    node.operational=Boolean((node.powered||config.optionalPower)&& (node.watered||config.optionalWater));
-    node.manual=!!(node.operational&&(!node.powered||!node.watered));
-    node.priority=Number.isInteger(priorities[node.id])?priorities[node.id]:(config.priority??9);
+  for(const n of nodes.values()){
+    n.operational=Boolean((n.powered||n.optionalPower)&&(n.watered||n.optionalWater));
+    n.manual=!!(n.operational&&(!n.powered||!n.watered));
   }
-  return {nodes:[...nodes.values()],byId:Object.fromEntries([...nodes].map(([id,n])=>[id,n])),totals,validLinks:valid.length};
+  return {nodes:[...nodes.values()],byId:Object.fromEntries(nodes),totals,validLinks:valid.length};
 }
 export function networkOperational(placement,simulation){return simulation.byId[placement.id]?.operational??false;}

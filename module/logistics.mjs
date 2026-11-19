@@ -200,11 +200,16 @@ async function replayDayOperation(plan){
   notification(`Наступил день ${plan.nextDay}.`);
   return {day:plan.nextDay,recovered:false};
 }
-export async function advanceDay() {
+export async function advanceDay(expectedDay=null) {
   if(!game.user.isGM)return notification('Только ведущий может перевести сутки.',true);
   if(gmLeader()?.id!==game.user.id)return notification('Сутки может переводить только ведущий, управляющий логистикой.',true);
   try{
     return await withWorldLock(async()=>{
+      if(expectedDay!==null){
+        const actual=game.settings.get(SYSTEM,'worldDay');
+        if(actual===expectedDay+1)return {day:actual,alreadyAdvanced:true};
+        if(actual!==expectedDay)throw Error('Игровые сутки изменились во время перехода.');
+      }
       let plan=game.settings.get(SYSTEM,'dayOperation');
       if(plan?.version!==1){
         const current=game.settings.get(SYSTEM,'worldDay');

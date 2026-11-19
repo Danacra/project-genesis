@@ -52,7 +52,7 @@ export class ColonyData extends TypeDataModel {
     infrastructure:new SchemaField({
       links:new ArrayField(new SchemaField({
         id:text(''),colonyId:text(''),sceneId:text(''),type:text('power'),
-        fromId:text(''),toId:text(''),createdDay:int(0,0,9999999),by:text(''),
+        fromId:text(''),toId:text(''),tier:int(1,1,3),createdDay:int(0,0,9999999),by:text(''),
         gmFree:new BooleanField({required:true,nullable:false,initial:false}),
         route:new ArrayField(new SchemaField({x:int(0,0,10000000),y:int(0,0,10000000)}),{initial:()=>[]}),
         tileIds:new ArrayField(text(''),{initial:()=>[]})
