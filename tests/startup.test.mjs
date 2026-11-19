@@ -33,15 +33,16 @@ test('colony includes research fields but retains legacy science points/tier',()
   assert.ok(schema.infrastructure.options.links && schema.infrastructure.options.processed);
   assert.ok(schema.crew.options.nodes && schema.crew.options.caches && schema.crew.options.jobs);
 });
-test('ready registers seven world socket handlers and exposes crew api',()=>{
+test('ready registers nine world socket handlers and exposes crew api',()=>{
   hooks.ready();
-  assert.equal(listeners.length,7);
+  assert.equal(listeners.length,9);
   assert.equal(game.projectGenesis.recipes.length,27);
   assert.equal(typeof game.projectGenesis.requestCrew,'function');
-  assert.equal(game.projectGenesis.buildings.length,12);
+  assert.equal(game.projectGenesis.buildings.length,14);
   assert.equal(typeof game.projectGenesis.requestIndustry,'function');
   assert.equal(game.projectGenesis.technologies.length,25);
   assert.equal(typeof game.projectGenesis.requestResearch,'function');
   assert.equal(typeof game.projectGenesis.advanceDay,'function');
   assert.equal(typeof game.projectGenesis.requestNetwork,'function');
+  assert.equal(typeof game.projectGenesis.toggleRoomLighting,'function');
 });

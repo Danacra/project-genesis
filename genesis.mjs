@@ -16,6 +16,8 @@ import {PLANET_ZONES,weatherForDay} from './module/planet.mjs';
 import {initializeRest,requestRest} from './module/rest.mjs';
 import {initializeMission,requestMission,missionStage} from './module/mission.mjs';
 import {startResourcePlacement,stopResourcePlacement} from './module/crew-placement.mjs';
+import {initializeBuildingInteractions,enterRoom,exitRoom,openStationCraft} from './module/building-interactions.mjs';
+import {initializeInteriorLighting,toggleRoomLighting} from './module/interior-lighting.mjs';
 const ID = 'project-genesis';
 Hooks.once('init',()=>{
   CONFIG.Actor.dataModels.survivor=SurvivorData;
@@ -47,6 +49,8 @@ Hooks.once('ready',()=>{
   initializeCrew();
   initializeRest();
   initializeMission();
-  game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement,planetZones:PLANET_ZONES,weatherForDay,requestRest,requestMission,missionStage};
+  initializeBuildingInteractions();
+  initializeInteriorLighting();
+  game.projectGenesis={advanceDay,requestResearch,requestIndustry,technologies:TECHNOLOGIES,recipes:RECIPES,buildings:BUILDINGS,buildingFootprints:BUILDING_FOOTPRINTS,startPlacement,cancelPlacement,startNetworkDrawing,cancelNetworkDrawing,requestNetwork,networkTypes:NETWORK_TYPES,requestCrew,resourceNodes:RESOURCE_NODES,startResourcePlacement,stopResourcePlacement,planetZones:PLANET_ZONES,weatherForDay,requestRest,requestMission,missionStage,enterRoom,exitRoom,openStationCraft,toggleRoomLighting};
   console.info(`PROJECT GENESIS v${game.system?.version || "development"} ready`);
 });

@@ -227,3 +227,74 @@
  .genesis .genesis-day{margin-left:auto;}
  .genesis .genesis-tabbar > [data-genesis-tab]{min-height:40px;}
 }
+
+/* v1.1: nested expedition studies, deliberately scoped to the research sheet */
+.genesis-research-main[hidden], [data-genesis-research-main][hidden],
+.genesis-research-subtree[hidden]{display:none!important}
+.genesis-field-entry{margin:4px 0 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:linear-gradient(105deg,#29453e,#1a3136);border:1px solid #6c9f7f;border-radius:9px;padding:12px 16px}
+.genesis-field-entry>div{display:flex;flex-direction:column;gap:4px}.genesis-field-entry strong{font-size:15px;color:#eaf9dc}.genesis-field-entry span{font-size:12px;color:#bad9cb}
+.genesis .genesis-tech-card.genesis-tech-group{background:linear-gradient(145deg,#305449,#1d3439);border:2px solid #9ccca4;box-shadow:0 0 0 2px #bde6bd18,0 4px 15px #0005}
+.genesis .genesis-tech-card.genesis-tech-group::after{content:'ОТКРЫТЬ 10 ИССЛЕДОВАНИЙ';font-size:9px;letter-spacing:.04em;color:#e4f4c2}
+.genesis-survey-inspector{padding:13px;background:#223c3a;border:1px solid #537d6c;border-radius:8px}.genesis-survey-inspector strong{color:#e0f2cb}
+.genesis-subtree-header{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:17px;background:linear-gradient(115deg,#24403e,#142932);border:1px solid #50776e;border-radius:10px;margin-bottom:14px}
+.genesis-subtree-header>div:nth-child(2){flex:1;min-width:240px}.genesis-subtree-header h3{font-family:Georgia,serif;font-size:26px;margin:4px 0 8px;color:#f1f5ec}.genesis-subtree-header p{margin:0!important}
+.genesis-subtree-header [data-genesis-back-to-tree]{flex:0 0 auto;padding:8px 12px;background:#365358;color:#edfff3;border:1px solid #71978f;border-radius:6px}
+.genesis-subtree-counter{min-width:90px;display:flex;flex-direction:column;text-align:center}.genesis-subtree-counter strong{font-size:24px;color:#b5e9be}.genesis-subtree-counter small{font-size:10px;letter-spacing:.07em}
+.genesis-subtree-progress{height:9px;background:#101f25;border-radius:15px;margin:0 0 20px;overflow:hidden;border:1px solid #44635c}
+.genesis-subtree-progress>span{display:block;height:100%;background:linear-gradient(90deg,#477a6e,#a3dca4);transition:width .2s}
+.genesis-subtree-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:14px;align-items:start}
+.genesis-subtree-phases{display:grid;grid-template-columns:repeat(4,minmax(165px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}
+.genesis-subtree-phase{background:#1c3036;border:1px solid #44635e;border-radius:9px;padding:11px;min-width:0}
+.genesis-subtree-phase header{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid #496a65;margin-bottom:10px;padding-bottom:11px}
+.genesis-subtree-phase header span{font-size:12px;color:#eacb91;font-weight:800}.genesis-subtree-phase header small{font-size:10px;color:#b1c9c0;line-height:1.35}
+.genesis .genesis-subtech-card{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:7px;text-align:left;padding:11px;margin-bottom:9px;border-radius:7px;border:1px solid #68877a;background:#25463f;color:#eaf5e8;min-height:112px;white-space:normal}
+.genesis-subtech-card strong{font-size:12px;line-height:1.3}.genesis-subtech-card small{color:#b9cebf;font-size:10px}.genesis-subtech-card em{color:#a6c2b7;font-size:10px;font-style:normal;line-height:1.3}
+.genesis .genesis-subtech-card.is-locked{background:#253238;border-color:#495b62;opacity:.85}
+.genesis .genesis-subtech-card.is-unlocked{background:#315a46;border-color:#90c896}
+.genesis .genesis-subtech-card.is-selected{outline:2px solid #f0cc85;outline-offset:1px}
+.genesis-subtech-progress{width:100%;height:5px;background:#13252b;overflow:hidden;border-radius:5px}.genesis-subtech-progress span{display:block;height:100%;background:#a8d7a1}
+.genesis-subtree-inspector{position:sticky;top:0;max-height:75vh;overflow-y:auto;border-radius:9px;background:#1e3035;border:1px solid #55786d;padding:16px}
+.genesis-subtree-inspector section[hidden]{display:none!important}
+.genesis-subtree-inspector h3{font-family:Georgia,serif;font-size:20px;color:#f3f6e7;margin:10px 0}
+.genesis-subtree-inspector h4{color:#edc995;font-size:12px;margin:14px 0 6px}
+.genesis-subtree-inspector p{font-size:12px;line-height:1.5}
+.genesis-subtree-inspector button{width:100%;margin-top:9px}
+.genesis-subtech-result{background:#294540;border-left:3px solid #a4ce9e;padding:10px;border-radius:4px}
+@media(max-width:1100px){.genesis-subtree-layout{grid-template-columns:1fr}.genesis-subtree-phases{grid-template-columns:repeat(4,minmax(170px,1fr))}.genesis-subtree-inspector{position:static;max-height:none}}
+
+/* v1.2 — in-world building interactions, interiors and safe removal */
+.genesis-scene-exit{position:fixed;left:330px;top:86px;z-index:4000;pointer-events:auto;
+  background:#20383d!important;color:#eaffeb!important;border:2px solid #75b88e!important;
+  box-shadow:0 6px 24px #050f11cc;padding:9px 15px;font-weight:700;font-size:13px;border-radius:7px;}
+.genesis-room-info{position:fixed;left:330px;top:132px;z-index:3999;pointer-events:none;
+  max-width:480px;color:#d4f4e4;background:#15282adf;padding:7px 12px;border-radius:6px;font-size:12px;}
+.genesis-building-hotspot{position:fixed;z-index:3000;transform:translate(-50%,0);pointer-events:auto;
+  background:#213b35eb!important;color:#e8ffee!important;border:1px solid #95c9a9!important;
+  box-shadow:0 4px 12px #000a;padding:5px 12px!important;min-height:27px;max-width:130px;
+  border-radius:7px;font-weight:700;font-size:12px;white-space:nowrap;cursor:pointer;}
+.genesis-building-hotspot:hover{background:#356e53!important;}
+.genesis .genesis-danger{background:#4d292c!important;border:1px solid #9b585b!important;color:#f8d8da!important;}
+.genesis .genesis-map-row{flex-wrap:wrap;}
+@media(max-width:700px){.genesis-scene-exit{left:12px;top:78px}.genesis-room-info{left:12px;top:129px;max-width:65vw}}
+
+.genesis-scene-build{position:fixed;left:330px;top:172px;z-index:4000;pointer-events:auto;
+  background:#294b43!important;color:#ebffe9!important;border:1px solid #75b88e!important;
+  padding:8px 13px;border-radius:7px;font-size:12px;font-weight:700;}
+@media(max-width:700px){.genesis-scene-build{left:12px;top:172px}}
+
+/* v1.2.1 — compact local warehouse diagnostics */
+.genesis-warehouse-capacity{font-size:12px;color:#bfe6d0;padding:6px 8px;border:1px solid #466457;border-radius:6px;background:#1b3a39;}
+
+/* v1.3 — interactive entry door in the interior canvas. */
+.genesis-interior-door{position:fixed;z-index:3200;transform:translate(-50%,-50%);
+  pointer-events:auto;background:#284c40f2!important;color:#ecfff4!important;
+  border:2px solid #b8e5b9!important;box-shadow:0 6px 22px #000b;
+  padding:9px 14px!important;border-radius:10px;font-size:12px;font-weight:800;
+  cursor:pointer;white-space:nowrap;}
+.genesis-interior-door:hover{background:#386f52!important;}
+
+/* v1.3.1 — room light switch is independent of crafting and door controls. */
+.genesis-room-light-switch{position:fixed;left:510px;top:172px;z-index:4001;pointer-events:auto;
+  background:#35434b!important;color:#effbff!important;border:1px solid #83b7c6!important;
+  padding:8px 13px!important;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
+@media(max-width:700px){.genesis-room-light-switch{left:12px;top:215px}}

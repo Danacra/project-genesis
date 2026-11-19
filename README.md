@@ -1,3 +1,13 @@
+# PROJECT GENESIS 1.3.1 — Interior Lighting
+
+Interior rooms now have an electricity-aware Foundry v13 AmbientLight. The light is enabled only when the parent building receives power and the room switch is on. The switch is available to the GM or players owning a survivor token inside the room. Existing rooms are supported. See `README_RU.md` and `TESTING_1.3.1_RU.md` for details.
+
+---
+
+# PROJECT GENESIS 1.3.0
+
+New in v1.3: GM-authoritative survivor token transit between linked exterior/interior scenes; a clickable interior exit, collision-aware landing positions, reserved doorway/buildable area, secure per-colony interior placement, electrical workstation diagnostics and order-to-station linkage for safe dismantling. All prior science, local warehouses and colony saves are retained. See `README_RU.md` and `TESTING_1.3_RU.md` for full Russian instructions. Test in a backup world before upgrading.
+
 # PROJECT GENESIS 1.0.0
 
 Standalone space-survival RPG system for **Foundry VTT v13**. Survive on an uninhabited alien planet, rebuild technology, manage crew logistics, research, facilities and utility grids, and complete a four-stage spaceship finale.
