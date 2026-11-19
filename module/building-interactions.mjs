@@ -13,6 +13,7 @@ import {moveSurvivorToken} from './scene-transfer.mjs';
 import {interiorLayout} from './interior-rules.mjs';
 import {DEVICES} from './network-rules.mjs';
 import {roomLightingInfo,toggleRoomLighting,syncInteriorLighting} from './interior-lighting.mjs';
+import {interiorBackground,syncInteriorAppearance} from './interior-decor-163.mjs';
 const SYSTEM='project-genesis';
 const pending=new Map();
 let detach=()=>{};
@@ -42,13 +43,15 @@ async function ensureRoom(colonyId,placementId){
   if(!isInteriorBuilding(placement.buildingId))throw Error('Это сооружение не имеет внутреннего помещения.');
   if(placement.interiorSceneId){
     if(!game.scenes.get(placement.interiorSceneId))throw Error('Связанная внутренняя сцена была удалена. Восстановите её из резервной копии.');
-    try{await syncInteriorLighting(game.scenes.get(placement.interiorSceneId));}catch(e){console.warn("PROJECT GENESIS: room light setup pending",e);}
+    const room=game.scenes.get(placement.interiorSceneId);
+    try{await syncInteriorLighting(room);}catch(e){console.warn("PROJECT GENESIS: room light setup pending",e);}
+    try{await syncInteriorAppearance(room,placement);}catch(e){console.warn('PROJECT GENESIS: room decor setup pending',e);}
     return placement.interiorSceneId;
   }
   const name=`${BUILDING_BY_ID[placement.buildingId].name} · ${exterior.name}`;
   const created=await Scene.create({name,width:1200,height:900,canvas:true,navigation:true,
     grid:{type:1,size:100,distance:1,units:'m'},padding:0,
-    background:{src:`systems/${SYSTEM}/assets/interiors/${placement.buildingId}.svg`,color:'#13202b'},
+    background:{src:interiorBackground(placement.buildingId,placement.tier),color:'#13202b'},
     environment:{darknessLevel:0.85},
     ownership:{default:2},flags:{[SYSTEM]:{interiorOf:placement.id,colonyId:colony.id,exteriorSceneId:exterior.id}}});
   if(!created?.id)throw Error('Не удалось создать внутреннюю сцену.');
@@ -60,6 +63,7 @@ async function ensureRoom(colonyId,placementId){
     throw error;
   }
   try{await syncInteriorLighting(created);}catch(e){console.warn("PROJECT GENESIS: room light setup pending",e);}
+  try{await syncInteriorAppearance(created,locatePlacement(colonyId,placementId).placement);}catch(e){console.warn('PROJECT GENESIS: room decor setup pending',e);}
   return created.id;
 }
 /** Pick a controlled survivor, or the single actor owned by this user on the map.
@@ -227,10 +231,11 @@ function buildCanvasInteractions(){
       const config=DEVICES[placement.buildingId];
       const requiresPower=isCraftStation(placement.buildingId)&&config?.power&&!config?.optionalPower;
       const offline=requiresPower&&!placementOperational(colony,placement,powerSnapshot);
-      el.textContent=isInteriorBuilding(placement.buildingId)?'⌂ Войти':isLocalWarehouse(placement)?'▣ Склад':
-        offline?'⚡ Нет питания':`⚒ Крафт · ${Number(placement.tier)||1} ур.`;
+      // Compact icons on map; the full action name and level are in the tooltip.
+      el.textContent=isInteriorBuilding(placement.buildingId)?'⌂':isLocalWarehouse(placement)?'▣':offline?'⚡':'⚒';
       el.title=(BUILDING_BY_ID[placement.buildingId]?.name||placement.buildingId)+
         ` · уровень ${Number(placement.tier)||1}`+(offline?' — не подключено электроснабжение':'');
+      el.setAttribute('aria-label',el.title);
       el.addEventListener('click',event=>{event.stopPropagation();void action();},input);
       document.body.append(el);buttons.push(el);
       const tile=canvas.tiles?.placeables?.find(t=>t.document?.id===placement.tileId);
@@ -246,7 +251,12 @@ function buildCanvasInteractions(){
         try{
           const at=canvas.clientCoordinatesFromCanvas({x:placement.x+placement.width/2,y:placement.y+12});
           el.style.left=`${at.x}px`;el.style.top=`${at.y}px`;
-          el.hidden=at.x<0||at.y<0||at.x>window.innerWidth||at.y>window.innerHeight;
+          const obstructed=[...document.querySelectorAll('.window-app, .application')].some(app=>{
+            if(!app.isConnected||app.offsetParent===null||app.getAttribute('aria-hidden')==='true')return false;
+            const rect=app.getBoundingClientRect();
+            return at.x>=rect.left&&at.x<=rect.right&&at.y>=rect.top&&at.y<=rect.bottom;
+          });
+          el.hidden=obstructed||at.x<0||at.y<0||at.x>window.innerWidth||at.y>window.innerHeight;
         }catch{el.hidden=true;}
       };
       reposition();repositioners.push(reposition);

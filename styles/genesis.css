@@ -422,3 +422,205 @@
 @keyframes genesis-hammer-glow{from{box-shadow:inset 0 0 8px #d5a76d88}to{box-shadow:inset 0 0 30px #ffd27acb}}
 @keyframes genesis-craft-success{0%{box-shadow:0 0 0 #81ffb700}30%{box-shadow:0 0 40px #81ffb7}100%{box-shadow:0 0 0 #81ffb700}}
 @media(max-width:750px){.genesis-craft-columns{grid-template-columns:1fr}.genesis-craft-header h2{font-size:16px}}
+
+/* PROJECT GENESIS 1.6.1: muted blue/teal expedition UI. */
+.genesis{
+  --pg-bg:#101923;--pg-panel:#1c2b38;--pg-line:#344855;
+  --pg-text:#e6eef3;--pg-muted:#a4b7c3;--pg-accent:#37b6aa;--pg-warm:#d9a66f;
+}
+.genesis .window-content{background:var(--pg-bg);}
+.genesis .genesis-layout{background:var(--pg-bg);overflow-x:clip;}
+.genesis .genesis-banner{gap:16px;padding:15px 20px;flex-wrap:wrap;
+  background:linear-gradient(110deg,#233a49,#142430 68%,#0e1c29);border-bottom:1px solid #405765;}
+.genesis .genesis-heading{flex:1 1 180px;}
+.genesis .genesis-heading h1{font-size:24px;margin:5px 0;color:#f1f5f8;}
+.genesis .genesis-header-controls{display:flex;align-items:end;gap:8px;flex:0 1 245px;min-width:0;}
+.genesis .genesis-header-switcher{min-width:0;flex:1;margin:0;}
+.genesis .genesis-header-inventory{width:auto;white-space:nowrap;min-width:100px;}
+.genesis .genesis-day{margin-left:auto;padding-left:14px;min-width:78px;align-self:stretch;justify-content:center;}
+.genesis .genesis-day strong{font-size:24px;}
+.genesis .genesis-workspace-row{display:flex;flex:1 1 auto;align-items:stretch;min-height:390px;min-width:0;}
+.genesis .genesis-sidebar-shell{position:relative;z-index:3;width:58px;flex:0 0 58px;min-width:0;
+  overflow:hidden;background:#152633;border-right:1px solid #405663;
+  transition:width .2s ease,flex-basis .2s ease;}
+.genesis .genesis-sidebar-shell:is(:hover,:focus-within),
+.genesis .genesis-sidebar-shell.is-pinned{width:225px;flex-basis:225px;}
+.genesis .genesis-sidebar-head{height:45px;display:flex;align-items:center;justify-content:space-between;
+  padding:7px 10px;gap:8px;overflow:hidden;white-space:nowrap;color:#8ea9b5;}
+.genesis .genesis-sidebar-head strong{font-size:10px;letter-spacing:.12em;opacity:0;transition:opacity .15s;}
+.genesis .genesis-sidebar-shell:is(:hover,:focus-within) .genesis-sidebar-head strong,
+.genesis .genesis-sidebar-shell.is-pinned .genesis-sidebar-head strong{opacity:1;}
+.genesis .genesis-sidebar-head [data-genesis-sidebar-toggle]{flex:none;width:35px;height:30px;padding:5px!important;margin-left:auto;}
+.genesis .genesis-sidebar-head [aria-pressed="true"]{background:#205f60;border-color:var(--pg-accent);color:#e2ffff;}
+.genesis .genesis-sidebar-shell .genesis-tabbar{display:flex!important;position:relative!important;
+  flex-direction:column!important;gap:2px;overflow-y:auto!important;overflow-x:hidden!important;
+  border:0!important;background:none!important;padding:5px!important;margin:0!important;
+  width:100%;max-height:min(700px,calc(100vh - 210px));scrollbar-width:thin;}
+.genesis .genesis-sidebar-shell .genesis-tabbar > [data-genesis-tab]{display:flex!important;
+  justify-content:flex-start;align-items:center;gap:16px;min-height:40px;flex:0 0 auto!important;
+  width:210px!important;min-width:210px!important;text-align:left;white-space:nowrap;
+  padding:9px 13px!important;border:0!important;border-left:3px solid transparent!important;
+  border-radius:7px!important;color:#a6bdc9!important;background:transparent!important;font-size:12px;}
+.genesis .genesis-sidebar-shell .genesis-tabbar > [data-genesis-tab] i{flex:0 0 18px;font-size:15px;text-align:center;}
+.genesis .genesis-sidebar-shell .genesis-tabbar > [data-genesis-tab].active{
+  background:#21434b!important;border-left-color:var(--pg-accent)!important;color:#c6fff8!important;}
+.genesis .genesis-sidebar-shell .genesis-tabbar > [data-genesis-tab]:hover{background:#2c414e!important;}
+.genesis .genesis-nav-label{font-size:12px;font-weight:600;opacity:0;transition:opacity .15s;}
+.genesis .genesis-sidebar-shell:is(:hover,:focus-within) .genesis-nav-label,
+.genesis .genesis-sidebar-shell.is-pinned .genesis-nav-label{opacity:1;}
+.genesis .genesis-workspace-body{min-width:0;flex:1 1 0;overflow-x:hidden;}
+.genesis .genesis-content{padding:18px clamp(11px,2vw,24px);animation:genesis-panel-in .18s ease-out both;}
+.genesis .genesis-panel{background:#1c2b38;border-color:#344855;box-shadow:0 6px 18px #07121a24;}
+.genesis .genesis-product-card{border-color:#3a525e;}
+.genesis .genesis-panel h2,.genesis .genesis-panel h3{letter-spacing:0;line-height:1.35;}
+.genesis .genesis-primary{background:#1c6665;border-color:#34978e;color:#e9ffff;}
+.genesis .genesis-primary:hover{background:#287c78;}
+.genesis .genesis-footer{background:#101c27;border-top:1px solid #2b4050;}
+.genesis .genesis-gm-note{font-size:12px;color:#e8c592;background:#3f372a7a;
+  border-left:3px solid #d9a66f;border-radius:4px;padding:9px 12px;margin-top:10px;}
+.genesis .genesis-day button,.genesis .genesis-header-inventory{font-size:12px;padding:7px 9px;}
+@keyframes genesis-panel-in{from{opacity:.6;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@media(min-width:751px){
+  .genesis .genesis-header-switcher{display:none;}
+  .genesis .genesis-header-controls{flex:0 0 auto;}
+}
+@media(max-width:750px){
+  .genesis .genesis-banner{padding:10px 12px;gap:9px;}
+  .genesis .genesis-portrait{width:54px;height:54px;}
+  .genesis .genesis-heading h1{font-size:20px;}
+  .genesis .genesis-header-controls{flex:1 1 130px;max-width:210px;}
+  .genesis .genesis-header-inventory{display:none;}
+  .genesis .genesis-sidebar-shell{width:47px;flex-basis:47px;}
+  .genesis .genesis-sidebar-shell:is(:hover,:focus-within),.genesis .genesis-sidebar-shell.is-pinned{
+    width:192px;flex-basis:192px;}
+  .genesis .genesis-sidebar-shell .genesis-tabbar > [data-genesis-tab]{width:185px!important;min-width:185px!important;padding:8px 8px!important;}
+  .genesis .genesis-content{padding:12px;}
+  .genesis .genesis-panels-2,.genesis .genesis-form-grid{grid-template-columns:minmax(0,1fr);}
+}
+@media(prefers-reduced-motion:reduce){
+ .genesis .genesis-sidebar-shell,.genesis .genesis-content,.genesis .genesis-nav-label{
+   transition:none!important;animation:none!important;}
+}
+/* Foundry application windows always appear over these compact canvas action markers. */
+.genesis-building-hotspot{z-index:20!important;min-width:31px!important;width:31px!important;
+ max-width:31px!important;height:31px!important;min-height:31px!important;
+ border-radius:50%!important;padding:0!important;font-size:16px!important;
+ line-height:29px!important;text-align:center!important;white-space:nowrap!important;}
+.genesis-building-hotspot:focus-visible{outline:2px solid #37b6aa;outline-offset:2px;}
+
+
+/* PROJECT GENESIS 1.6.3 - Civilization-like science eras, accessible scrolling. */
+.genesis .genesis-research-page{--science-panel:#172733;--science-line:#47606b;}
+.genesis .genesis-era-rail{display:flex;gap:7px;margin:0 0 12px;overflow-x:auto;padding:5px 2px 10px;
+ scroll-snap-type:x proximity;scrollbar-width:thin;}
+.genesis .genesis-era-rail button{flex:1 0 145px;max-width:210px;display:flex;flex-direction:column;gap:5px;
+ text-align:left;min-height:60px;padding:10px 13px!important;background:linear-gradient(140deg,#27424f,#1b303b);
+ border:1px solid #4d6875!important;border-bottom:3px solid #947a56!important;border-radius:7px!important;
+ scroll-snap-align:start;transition:background .2s ease,border-color .2s ease;}
+.genesis .genesis-era-rail button:hover,.genesis .genesis-era-rail button.is-current{
+ background:#315262!important;border-color:#42b5ab!important;}
+.genesis .genesis-era-number{font-size:9px;letter-spacing:.14em;color:#c6a575;font-weight:800;}
+.genesis .genesis-era-rail button strong{color:#e9eef2;font-size:12px;line-height:1.3;}
+.genesis .genesis-tech-toolbar{background:#172733!important;border:1px solid #3b5864;border-radius:9px;}
+.genesis .genesis-tech-controls-hint{font-size:11px;color:#9bb4c0;margin:3px 0 0;line-height:1.45;}
+.genesis .genesis-tech-filters button{border-radius:20px!important;padding:7px 11px!important;}
+.genesis .genesis-tech-filters button.active{background:#267d7b!important;color:#e7ffff;}
+.genesis .genesis-tech-viewport{height:540px!important;background:
+ radial-gradient(circle at 1px 1px,#35515f 1px,transparent 0) 0 0/24px 24px,
+ linear-gradient(130deg,#12222e,#1b303c 55%,#172633)!important;
+ border:1px solid #46606d!important;border-radius:9px!important;cursor:grab;
+ scrollbar-color:#476e76 #14252e;}
+.genesis .genesis-tech-viewport.is-dragging{cursor:grabbing;user-select:none;}
+.genesis .genesis-tech-board{gap:62px!important;padding:25px 26px 42px!important;}
+.genesis .genesis-tech-era{width:200px!important;flex:0 0 200px!important;gap:11px!important;}
+.genesis .genesis-tech-era h3{min-height:56px!important;display:flex;align-items:center;gap:9px;
+ padding:10px 5px!important;font-size:11px!important;letter-spacing:.06em;color:#e3be86!important;
+ border-bottom:2px solid #745f48!important;}
+.genesis .genesis-era-head-mark{display:inline-flex;align-items:center;justify-content:center;
+ width:28px;height:28px;flex:none;border-radius:6px;background:#6c5941;color:#f7d7a6;font-size:12px;}
+.genesis .genesis-tech-card{border:1px solid #54727c!important;border-left:4px solid #426b73!important;
+ background:linear-gradient(145deg,#2b4755,#203844)!important;color:#e6f1f5!important;
+ min-height:125px!important;border-radius:7px!important;padding:11px!important;
+ transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease;}
+.genesis .genesis-tech-card:hover{transform:translateY(-2px);border-color:#69b5b3!important;box-shadow:0 5px 20px #060f1675;}
+.genesis .genesis-tech-card.is-selected{border-color:#e6bf7b!important;outline:2px solid #e6bf7b!important;outline-offset:2px;}
+.genesis .genesis-tech-card.is-unlocked{background:linear-gradient(145deg,#244c49,#1a373a)!important;
+ border-left-color:#53b7ab!important;}
+.genesis .genesis-tech-card.is-locked{background:#263540!important;opacity:.74;border-left-color:#627583!important;}
+.genesis .genesis-tech-card .genesis-tech-card-label{font-size:10px;color:#c6aa82;display:flex;
+ align-items:center;gap:7px;font-weight:700;}
+.genesis .genesis-tech-card .genesis-tech-branch-glyph{display:inline-flex;align-items:center;justify-content:center;
+ width:25px;height:25px;flex:none;border-radius:5px;background:#263b48;font-size:17px;color:#e7c78a;}
+.genesis .genesis-tech-card[data-genesis-tech-branch="survival"] .genesis-tech-branch-glyph::after{content:"✦"}
+.genesis .genesis-tech-card[data-genesis-tech-branch="materials"] .genesis-tech-branch-glyph::after{content:"▦"}
+.genesis .genesis-tech-card[data-genesis-tech-branch="bio"] .genesis-tech-branch-glyph::after{content:"✚"}
+.genesis .genesis-tech-card[data-genesis-tech-branch="energy"] .genesis-tech-branch-glyph::after{content:"ϟ"}
+.genesis .genesis-tech-card[data-genesis-tech-branch="computing"] .genesis-tech-branch-glyph::after{content:"⌘"}
+.genesis .genesis-tech-card[data-genesis-tech-branch="space"] .genesis-tech-branch-glyph::after{content:"◇"}
+.genesis .genesis-tech-card strong{font-size:14px!important;line-height:1.38!important;}
+.genesis .genesis-tech-progress{height:7px!important;background:#142631!important;}
+.genesis .genesis-tech-progress>span{background:linear-gradient(90deg,#35b7a7,#82ddc5)!important;}
+.genesis .genesis-tech-links path{stroke-width:3!important;stroke:#557585!important;opacity:.66;}
+.genesis .genesis-tech-links path.is-unlocked{stroke:#51c7a6!important;opacity:.95;}
+.genesis .genesis-tech-inspector{height:540px;max-height:540px!important;
+ background:linear-gradient(160deg,#203745,#172934)!important;border-color:#526f79!important;
+ box-shadow:0 6px 20px #07111a50;}
+.genesis .genesis-tech-inspector-heading{display:grid;gap:4px;border-bottom:1px solid #405c65;
+ padding:0 0 12px;margin:0 0 12px;}
+.genesis .genesis-tech-inspector-heading span{font-size:10px;letter-spacing:.12em;color:#e0bf87;font-weight:800;}
+.genesis .genesis-tech-inspector-heading small{font-size:11px;color:#a9bec9;}
+.genesis .genesis-tech-legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+ padding:12px 9px;color:#a8becb;font-size:11px;}
+.genesis .genesis-tech-legend span{display:flex;align-items:center;gap:6px;}
+.genesis .genesis-tech-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.genesis .genesis-tech-legend i.is-unlocked{background:#4db5a7;}
+.genesis .genesis-tech-legend i.is-ready{background:#d5ae76;}
+.genesis .genesis-tech-legend i.is-locked{background:#657c89;}
+@media(max-width:940px){.genesis .genesis-tech-viewport{height:430px!important;}
+ .genesis .genesis-tech-inspector{height:auto;max-height:420px!important;}}
+@media(prefers-reduced-motion:reduce){.genesis .genesis-tech-card,.genesis .genesis-era-rail button{
+  transition:none!important;}}
+
+
+/* PROJECT GENESIS 1.6.4: world clock and specialization preview. */
+.genesis .genesis-clock-panel{min-width:150px;max-width:270px;align-self:stretch;
+ display:flex;flex-direction:column;gap:5px;justify-content:center;padding:3px 0 3px 14px;
+ border-left:1px solid #405663;white-space:normal;text-align:center;flex:0 1 220px;}
+.genesis .genesis-clock-caption{font-size:10px;letter-spacing:.12em;color:#a8bcc8;}
+.genesis .genesis-clock-caption b{font-weight:800;color:#d9a66f;}
+.genesis .genesis-clock-panel strong[data-genesis-clock-time]{font-family:ui-monospace,Consolas,monospace;
+ font-size:27px;color:#48c8b6!important;font-weight:800;letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+.genesis .genesis-clock-panel [data-genesis-clock-state]{font-size:10px;color:#b0c6ce;}
+.genesis .genesis-clock-controls{display:grid;grid-template-columns:auto minmax(74px,1fr) auto;
+ align-items:end;gap:5px;margin-top:6px;}
+.genesis .genesis-clock-controls button{min-width:0;font-size:11px!important;padding:5px 7px!important;
+ white-space:nowrap;min-height:27px;}
+.genesis .genesis-clock-controls [data-genesis-action="day"]{grid-column:1/-1;}
+.genesis .genesis-clock-controls label{margin:0;text-align:left;font-size:9px;min-width:0;}
+.genesis .genesis-clock-controls select{width:100%;padding:2px 5px!important;min-height:27px!important;
+ font-size:11px;}
+.genesis .genesis-specialization-panel{border-color:#35656c;}
+.genesis .genesis-specialization-status{display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+ border-bottom:1px solid #3a5460;padding:0 0 12px;margin-bottom:12px;}
+.genesis .genesis-specialization-status span{font-size:10px;letter-spacing:.09em;color:#aac1c8;}
+.genesis .genesis-specialization-status strong{font-size:18px;color:#53d0ba;}
+.genesis .genesis-specialization-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+.genesis .genesis-specialization-item{padding:12px;border:1px solid #354d5c;border-radius:8px;
+ background:#172733;display:grid;gap:7px;min-width:0;}
+.genesis .genesis-specialization-item.is-ready{border-color:#348d7e;background:linear-gradient(130deg,#1b3b40,#1d2c37);}
+.genesis .genesis-specialization-item strong{color:#e5f2f2;font-size:13px;}
+.genesis .genesis-specialization-item small{display:block;margin-top:5px;font-size:11px;color:#a8c0c9;}
+.genesis .genesis-specialization-item p{font-size:11px;line-height:1.48;color:#a2b7c2;margin:0;}
+.genesis .genesis-specialization-item progress{width:100%;height:7px;accent-color:#4fc4ae;}
+.genesis .genesis-profile-specialization{display:grid;gap:5px;margin:0 0 15px;
+ border-left:3px solid #4fc4ae;background:#162b35;border-radius:5px;padding:9px 12px;}
+.genesis .genesis-profile-specialization span{font-size:11px;color:#a8bdc7;}
+.genesis .genesis-profile-specialization strong{font-size:16px;color:#4fc4ae;}
+.genesis .genesis-profile-specialization small{font-size:11px;color:#a3bbc6;}
+@media(max-width:940px){.genesis .genesis-clock-panel{max-width:200px;flex-basis:180px;}
+ .genesis .genesis-clock-panel strong[data-genesis-clock-time]{font-size:22px;}}
+@media(max-width:700px){.genesis .genesis-specialization-grid{grid-template-columns:minmax(0,1fr);}
+ .genesis .genesis-clock-panel{max-width:none;flex:1 1 100%;border-left:0;border-top:1px solid #3b5864;
+ padding-top:10px;}
+ .genesis .genesis-clock-controls{grid-template-columns:auto minmax(76px,1fr) auto;}}
+@media(prefers-reduced-motion:reduce){.genesis .genesis-specialization-item{transition:none!important;}}

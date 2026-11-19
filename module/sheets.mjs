@@ -1,4 +1,6 @@
 import {libraryContext} from './library.mjs';
+import {clockContext,setClockPaused,setClockSpeed,advanceOneHour,manualAdvanceDay,renderClockWidgets} from './world-clock-164.mjs';
+import {specializationProfile} from './clock-rules-164.mjs';
 import { ABILITIES, SKILLS, ITEM_TYPES, measure, capacity, containerCapacity, itemLoad,
   perQuantity, plus, fits, round, qty, checkResult, summarizeInventory } from './rules.mjs';
 import { requestTransfer, recentOperations, advanceDay } from './logistics.mjs';
@@ -15,6 +17,7 @@ import {startResourcePlacement} from './crew-placement.mjs';
 import {enterRoom,openStationCraft} from './building-interactions.mjs';
 import {salvageFor} from './structure-rules.mjs';
 import {BUILDING_BY_ID,resourceName} from './industry-data.mjs';
+import {trackGenesisSheet,untrackGenesisSheet,restoreGenesisScroll} from './sheet-refresh.mjs';
 const {HandlebarsApplicationMixin} = foundry.applications.api;
 const {ActorSheetV2,ItemSheetV2} = foundry.applications.sheets;
 const Dialog = foundry.applications.api.DialogV2;
@@ -189,7 +192,17 @@ async function askNetwork(sheet,el){
     await requestNetwork({action,colonyId:colony.id,placementId:el.dataset.placementId,priority:Number(el.dataset.priority)});
     return;
   }
-  if(action==='disconnect'){
+  if(action==='upgrade-chain'||action==='gm-upgrade-chain'){
+     if(action==='gm-upgrade-chain'&&!game.user.isGM)return;
+     const link=networkContext(colony,game.user).links.find(l=>l.id===linkId);
+     if(!link||!(action==='gm-upgrade-chain'?link.canGMUpgrade:link.canUpgrade))return;
+     const accepted=await Dialog.confirm({window:{title:'Улучшить всю инженерную цепь?'},
+       content:`<p>До уровня ${link.nextTier} будут улучшены все связанные участки этого типа на сцене. Сегментов: ${link.upgradeCells}. Стоимость: ${action==='gm-upgrade-chain'?'бесплатно (GM)':esc(link.upgradeCosts)}.</p>`,
+       yes:{label:'Улучшить цепь'},no:{label:'Отмена'}}).catch(()=>false);
+     if(accepted)await requestNetwork({action,colonyId:colony.id,linkId});
+     return;
+   }
+   if(action==='disconnect'){
     let accepted=false;
     try{accepted=await Dialog.confirm({window:{title:'Демонтаж сети'},
       content:'<p>Выбранные кабели или трубы будут удалены с карты. Затраченные материалы не возвращаются.</p>',
@@ -204,7 +217,7 @@ async function askIndustry(sheet,el){
   const action=el.dataset.industryAction;
   const details={colonyId:colony.id,action,subject:el.dataset.subject||'',
     jobId:el.dataset.jobId||'',queue:el.dataset.queue||''};
-  if(action==='upgrade-building'){
+  if(action==='upgrade-building'||action==='resize-building'){
     details.placementId=el.dataset.placementId||'';
     details.gmFree=el.dataset.gmFree==='true';
   }
@@ -378,7 +391,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     form:{submitOnChange:false,closeOnSubmit:false},
     actions:{editImage:this.editImage}};
   static PARTS={body:{template:'systems/project-genesis/templates/actor.hbs'}};
-  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._subtreeOpen=false;this._researchGroup='survey';this._subtechSelected='survey-landing';this._libraryChapter='start';}
+  constructor(options={}){super(options);this._sidebarPinned=false;this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._techScrollLeft=0;this._subtreeOpen=false;this._researchGroup='survey';this._subtechSelected='survey-landing';this._libraryChapter='start';}
   async _prepareContext(options){
     const ctx=await super._prepareContext(options),actor=this.document;
     const cap=capacity(actor),inventory=summarizeInventory(actor.items),load=inventory.load;
@@ -387,6 +400,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     // A network snapshot is expensive: compute it once, share it across all sheet sections.
     const networkSnapshot=colony?getNetworkSimulation(colony):null;
     return {...ctx,actor,isColony,isSurvivor,editable:actor.isOwner,isGM:game.user.isGM,
+      clock:clockContext(),specialization:specializationProfile(actor.system),
       abilities:Object.entries(ABILITIES).map(([key,label])=>({key,label,value:fieldValue(actor,`abilities.${key}`)})),
       skills:Object.entries(SKILLS).map(([key,label])=>({key,label,value:fieldValue(actor,`skills.${key}`)})),
       vitals:!isColony?Object.entries(actor.system.survival).map(([key,value])=>({key,value,label:({health:'Здоровье',hunger:'Голод',thirst:'Жажда',fatigue:'Усталость',oxygen:'Кислород'})[key]})):[],
@@ -410,6 +424,15 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
   _onRender(context,options){
     super._onRender(context,options);
     const root=this.element;
+    trackGenesisSheet(this);
+    const sidebar=root.querySelector('[data-genesis-sidebar]');
+    const pin=sidebar?.querySelector('[data-genesis-sidebar-toggle]');
+    const applyPin=()=>{
+      sidebar?.classList.toggle('is-pinned',this._sidebarPinned);
+      pin?.setAttribute('aria-pressed',String(this._sidebarPinned));
+      if(pin){pin.title=this._sidebarPinned?'Открепить боковую панель':'Закрепить боковую панель';}
+    };
+    applyPin();
     this._genesisEvents?.abort();
     this._genesisEvents=new AbortController();
     const eventOptions={signal:this._genesisEvents.signal};
@@ -480,6 +503,37 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       this._techResizeObserver.observe(board);
     }
     applyView();
+    if(this._genesisPendingScroll){
+      restoreGenesisScroll(root,this._genesisPendingScroll);
+      this._genesisPendingScroll=null;
+    }
+    const viewport=root.querySelector('.genesis-tech-viewport');
+    if(viewport){
+      // Preserve era position on rerender; keep drag-to-pan separate from card clicks.
+      if(this._techScrollLeft>0)viewport.scrollLeft=this._techScrollLeft;
+      viewport.addEventListener('scroll',()=>{this._techScrollLeft=viewport.scrollLeft;},eventOptions);
+      let drag=null;
+      viewport.addEventListener('pointerdown',event=>{
+        if(event.button!==0||event.pointerType!=='mouse'||event.target.closest?.('button,a,input,select,textarea'))return;
+        drag={x:event.clientX,y:event.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};
+        viewport.classList.add('is-dragging');
+        viewport.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+      },eventOptions);
+      viewport.addEventListener('pointermove',event=>{
+        if(!drag)return;
+        viewport.scrollLeft=drag.left-(event.clientX-drag.x);
+        viewport.scrollTop=drag.top-(event.clientY-drag.y);
+      },eventOptions);
+      const endDrag=()=>{drag=null;viewport.classList.remove('is-dragging');};
+      viewport.addEventListener('pointerup',endDrag,eventOptions);
+      viewport.addEventListener('pointercancel',endDrag,eventOptions);
+      viewport.addEventListener('lostpointercapture',endDrag,eventOptions);
+      viewport.addEventListener('wheel',event=>{
+        if(!event.shiftKey)return;
+        event.preventDefault();viewport.scrollLeft+=event.deltaY||event.deltaX;
+      },{...eventOptions,passive:false});
+    }
     if(root.querySelector('[data-genesis-tech-search]')) root.querySelector('[data-genesis-tech-search]').value=this._techQuery;
     root.querySelector('[data-genesis-tech-search]')?.addEventListener('input',event=>{
       this._techQuery=event.target.value;applyView();
@@ -500,6 +554,13 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     },eventOptions);
     // One delegated handler per event type instead of O(number of items) listeners.
     root.addEventListener('change',event=>{
+      const clockSpeed=event.target.closest?.('[data-genesis-clock-speed]');
+      if(clockSpeed){
+        if(!game.user.isGM)return;
+        void setClockSpeed(Number(clockSpeed.value)).then(renderClockWidgets)
+          .catch(error=>ui.notifications.error(error.message));
+        return;
+      }
       const quickNav=event.target.closest?.('[data-genesis-quick-nav]');
       if(quickNav){
         const target=quickNav.value;
@@ -529,6 +590,38 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         ['abilities','skills','survival','biography','specialization','notes','capacity','biome','name']);
     },eventOptions);
     root.addEventListener('click',async event=>{
+      const clockToggle=event.target.closest?.('[data-genesis-clock-toggle]');
+      if(clockToggle&&game.user.isGM){
+        await setClockPaused(!clockContext().paused).then(renderClockWidgets)
+          .catch(error=>ui.notifications.error(error.message));
+        return;
+      }
+      const clockHour=event.target.closest?.('[data-genesis-clock-hour]');
+      if(clockHour&&game.user.isGM){
+        await advanceOneHour().then(renderClockWidgets)
+          .catch(error=>ui.notifications.error(error.message));
+        return;
+      }
+      const toggle=event.target.closest?.('[data-genesis-sidebar-toggle]');
+      if(toggle){this._sidebarPinned=!this._sidebarPinned;applyPin();return;}
+      const eraJump=event.target.closest?.('[data-genesis-era-jump]');
+      if(eraJump){
+        const era=root.querySelector(`[data-genesis-era="${eraJump.dataset.genesisEraJump}"]`);
+        const viewport=root.querySelector('.genesis-tech-viewport');
+        if(era&&viewport){
+          viewport.scrollTo({left:Math.max(0,era.offsetLeft-30),behavior:'smooth'});
+          root.querySelectorAll('[data-genesis-era-jump]').forEach(b=>
+            b.classList.toggle('is-current',b===eraJump));
+        }
+        return;
+      }
+      if(event.target.closest?.('[data-genesis-era-home]')){
+        const viewport=root.querySelector('.genesis-tech-viewport');
+        this._techScrollLeft=0;
+        viewport?.scrollTo({left:0,top:0,behavior:'smooth'});
+        root.querySelectorAll('[data-genesis-era-jump]').forEach(b=>b.classList.remove('is-current'));
+        return;
+      }
       const shortcut=event.target.closest?.('[data-genesis-open-tab]');
       if(shortcut){
         const target=shortcut.dataset.genesisOpenTab;
@@ -580,7 +673,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         else if(action==='create'&&this.document.isOwner)await askNewItem(this.document);
         else if(action==='container'&&this.document.isOwner)await askNewItem(this.document,true);
         else if(action==='roll'&&this.document.isOwner)await rollCheck(this.document,el.dataset.ability);
-        else if(action==='day'&&game.user.isGM)await advanceDay();
+        else if(action==='day'&&game.user.isGM)await manualAdvanceDay().catch(error=>ui.notifications.error(error.message));
         else if(action==='rest'&&this.document.type==='survivor')await requestRest(this.document.id,el.dataset.restKind);
         else if(action==='mission'){const colony=colonyFor(this.document);if(colony)await requestMission(colony.id);}
         else if(['work','invest','complete','facility','grant'].includes(action))await askResearch(this,action,el.dataset.techId,el.dataset.facilityId);
@@ -615,7 +708,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       } finally {el.disabled=false;}
     },eventOptions);
   }
-  async _onClose(options){this._genesisEvents?.abort();this._techResizeObserver?.disconnect();await super._onClose(options);}
+  async _onClose(options){untrackGenesisSheet(this);this._genesisEvents?.abort();this._techResizeObserver?.disconnect();await super._onClose(options);}
 }
 export class GenesisItemSheet extends HandlebarsApplicationMixin(ItemSheetV2){
   static DEFAULT_OPTIONS={classes:['genesis','item-sheet'],tag:'form',position:{width:500,height:570},

@@ -6,7 +6,10 @@ import { colonyFor } from './research.mjs';
 import { stockByCode, effectiveUnlocked } from './research-rules.mjs';
 import { tierUpgrade,tierOf,stationSupportsRecipe } from './building-progress.mjs';
 import { validateStagedInputs,craftLoadFits } from './crafting-rules.mjs';
-import { assertPlacement, asTileData, tileAsset, placementHealth, assertHealthyPlacement, validateTileLink } from './map-rules.mjs';
+import { assertPlacement, asTileData, tileAsset, placementHealth, assertHealthyPlacement, validateTileLink, cellsFor, sceneGeometry } from './map-rules.mjs';
+import {planBuildingResize} from './structure-upgrades-162.mjs';
+import {DEVICES} from './network-rules.mjs';
+import {utilityProfile} from './tier-rules-162.mjs';
 import { stationOperational,placementOperational,getNetworkSimulation } from './networks.mjs';
 import {isInteriorBuilding,isCraftStation,salvageFor,structureBlockers,assertCanPlaceInside,assertInteriorOwnership} from './structure-rules.mjs';
 import {capacity,summarizeInventory} from './rules.mjs';
@@ -209,34 +212,50 @@ async function commit(request){
       });
     }
     result=`Добавлено в очередь: ${r.name} · ${queueDays} сут.`;
-  }else if(action==='upgrade-building'){
+  }else if(action==='upgrade-building'||action==='resize-building'){
     const placement=array(industry.placements).find(p=>p.id===request.placementId);
     if(!placement||placement.status!=='finished')throw Error('Сначала постройте здание.');
     const scene=game.scenes.get(placement.sceneId),tile=scene?.tiles?.get?.(placement.tileId);
     assertHealthyPlacement(placement,scene,tile);
-    const plan=tierUpgrade(placement);
-    const free=!!request.gmFree;
-    if(free&&!user.isGM)throw Error('Бесплатно улучшать здания может только GM.');
+    const syncOnly=action==='resize-building';
+    if(syncOnly&&!user.isGM)throw Error('Выравнивать старые размеры построек может только GM.');
+    const plan=syncOnly?null:tierUpgrade(placement);
+    const targetTier=syncOnly?tierOf(placement):plan.next;
+    const free=syncOnly||!!request.gmFree;
+    if(!syncOnly&&free&&!user.isGM)throw Error('Бесплатно улучшать здания может только GM.');
     if(!free&&!effectiveUnlocked(colony.system.science).has(plan.techId))
       throw Error('Требуется изучение: '+plan.techId+'.');
-    const newPlacements=array(industry.placements).map(p=>p.id===placement.id?{...p,tier:plan.next}:p);
-    const update={placements:newPlacements,history:history(industry,'upgrade',`${plan.building.name} · уровень ${plan.next}`,user.name),
+    const geometry=planBuildingResize(placement,targetTier,scene,industry.placements,colony.system.infrastructure?.links||[]);
+    if(syncOnly&&geometry.width===placement.width&&geometry.height===placement.height)
+      throw Error('Размеры здания уже соответствуют его уровню.');
+    // Validate and reserve materials before changing any tile. Never change custom artwork.
+    const taken=free?null:planTake(colony.items,plan.inputs);
+    const previous={x:tile.x,y:tile.y,width:tile.width,height:tile.height,
+      texture:tile.texture?.src||'',tier:tile.flags?.[SYSTEM]?.tier||tierOf(placement)};
+    const standard=`systems/${SYSTEM}/assets/buildings/${placement.buildingId}`;
+    const standardArt=previous.texture.startsWith(standard)&&previous.texture.endsWith('.png');
+    const newPlacements=array(industry.placements).map(p=>p.id===placement.id?
+      {...p,tier:targetTier,x:geometry.x,y:geometry.y,width:geometry.width,height:geometry.height}:p);
+    const update={placements:newPlacements,
+      history:history(industry,syncOnly?'resize':'upgrade',`${BUILDING_BY_ID[placement.buildingId]?.name||placement.buildingId} · уровень ${targetTier}`,user.name),
       processed:processed(industry,request.id)};
-    const previousTexture=tile.texture?.src||'';
-    // Do not replace user-authored art. Only swap standard package sprites.
-    const standard=`systems/${SYSTEM}/assets/buildings/${plan.building.id}`;
-    const replaceArt=previousTexture.startsWith(standard)&&previousTexture.endsWith('.png');
-    if(replaceArt)await tile.update({'texture.src':tileAsset(plan.building.id,true,plan.next),
-      [`flags.${SYSTEM}.tier`]:plan.next});
+    const tilePatch={x:geometry.x,y:geometry.y,width:geometry.width,height:geometry.height,
+      [`flags.${SYSTEM}.tier`]:targetTier};
+    if(standardArt)tilePatch['texture.src']=tileAsset(placement.buildingId,true,targetTier);
+    let tileTouched=false;
     try{
+      tileTouched=true;await tile.update(tilePatch);
       if(free)await colony.update(patchIndustry(update));
-      else await debitAndCommit(colony,planTake(colony.items,plan.inputs),update);
+      else await debitAndCommit(colony,taken,update);
     }catch(error){
-      if(replaceArt){try{await tile.update({'texture.src':previousTexture,[`flags.${SYSTEM}.tier`]:plan.current});}
-        catch(e){console.error('GENESIS: upgrade art rollback failed',e);}}
+      if(tileTouched){try{await tile.update({x:previous.x,y:previous.y,width:previous.width,height:previous.height,
+        'texture.src':previous.texture,[`flags.${SYSTEM}.tier`]:previous.tier});}
+        catch(e){console.error('GENESIS building geometry rollback failed',e);
+          throw Error('Не удалось вернуть геометрию здания. GM должен проверить тайл и резервную копию.');}}
       throw error;
     }
-    result=`Улучшено: ${plan.building.name} · уровень ${plan.next}${free?' (GM бесплатно)':''}.`;
+    result=syncOnly?`Размеры постройки согласованы с уровнем ${targetTier}.`:
+      `Улучшено: ${BUILDING_BY_ID[placement.buildingId]?.name||placement.buildingId} · уровень ${targetTier}${free?' (GM бесплатно)':''}.`;
   }else if(action==='start-building'){
     const status=buildingState(request.subject,colony);
     if(!status.unlocked)throw Error('Для здания не изучена технология.');
@@ -634,7 +653,13 @@ export function industryContext(actor,user,precomputedSimulation=null){
       const tier=tierOf(p);
       const next=tier<3?tierUpgrade(p):null;
       const canUpgrade=!!next&&effectiveUnlocked(colony.system.science).has(next.techId);
-      return {...p,tier,tierMark:['','◆','◆◆','◆◆◆'][tier],
+      const grid=scene?.grid?.size||100,footprint=cellsFor(p.buildingId,tier)||[0,0];
+       const needsResize=p.status==='finished'&&health==='ok'&&(p.width!==footprint[0]*grid||p.height!==footprint[1]*grid);
+       const power=utilityProfile(p.buildingId,tier,DEVICES);
+       return {...p,needsResize,footprintLabel:`${footprint[0]}×${footprint[1]}`,
+         tierPower:power.power,tierWater:power.water,tierPowerOut:power.powerOut,
+         canSyncSize:user.isGM&&needsResize,
+         tier,tierMark:['','◆','◆◆','◆◆◆'][tier],
         upgradeCost:next?Object.entries(next.inputs).map(([code,count])=>`${resourceName(code)} ×${count}`).join(' · '):'',
         upgradeTech:next?.techId||'',nextTier:next?.next||0,
         canUpgrade:canAct&&canUpgrade&&p.status==='finished'&&health==='ok'&&!p.gmInstant,

@@ -3,6 +3,7 @@
  * This version deliberately supports square-grid scenes only.
  */
 import {interiorPlacementProblem} from './interior-rules.mjs';
+import {buildingCells} from './tier-rules-162.mjs';
 export const BUILDING_FOOTPRINTS = Object.freeze({
   bench:[2,2], fieldLab:[3,3], furnace:[3,3], bioLab:[3,3],
   powerLab:[3,3], electronicsLab:[3,3], flightLab:[5,4],
@@ -15,7 +16,7 @@ export const BASE_TILE = `systems/${SYSTEM}/assets/buildings/`;
 // All images use the same source id and preserve the grid footprint in cells.
 export const tileAsset=(id,finished=false,tier=1)=>
   `${BASE_TILE}${finished&&Object.hasOwn(BUILDING_FOOTPRINTS,id)?id+(Number(tier)>1?'-t'+Math.min(3,Number(tier)):'')+'.png':'construction-site.svg'}`;
-export const cellsFor=(id)=>BUILDING_FOOTPRINTS[id]||null;
+export const cellsFor=(id,tier=1)=>buildingCells(BUILDING_FOOTPRINTS[id],tier);
 export function sceneGeometry(scene){
   const grid=Number(scene?.grid?.size);
   const type=Number(scene?.grid?.type);
@@ -31,8 +32,8 @@ export function snapToGrid(x,y,grid,bounds){
   return {x:bounds.x+Math.floor((x-bounds.x)/grid)*grid,
     y:bounds.y+Math.floor((y-bounds.y)/grid)*grid};
 }
-export function footprintRect(buildingId,position,geometry){
-  const cells=cellsFor(buildingId);
+export function footprintRect(buildingId,position,geometry,tier=1){
+  const cells=cellsFor(buildingId,tier);
   if(!cells)throw Error('Неизвестное сооружение.');
   const {grid,bounds}=geometry;
   const snapped=snapToGrid(Number(position.x),Number(position.y),grid,bounds);
@@ -47,9 +48,9 @@ export function tilesBlocking(scene){
     return !!(f?.buildingId||f?.blockPlacement);
   }).map(t=>({id:t.id||t._id,x:Number(t.x),y:Number(t.y),width:Number(t.width),height:Number(t.height)}));
 }
-export function checkPlacement(buildingId,position,scene,{placements=[],ignoreTileId=''}={}){
+export function checkPlacement(buildingId,position,scene,{placements=[],ignoreTileId='',tier=1}={}){
   const geometry=sceneGeometry(scene);
-  const rect=footprintRect(buildingId,position,geometry);
+  const rect=footprintRect(buildingId,position,geometry,tier);
   const b=geometry.bounds;
   const inside=rect.x>=b.x && rect.y>=b.y && rect.x+rect.width<=b.x+b.width && rect.y+rect.height<=b.y+b.height;
   const blocked=tilesBlocking(scene).some(t=>t.id!==ignoreTileId&&overlaps(rect,t)) ||
