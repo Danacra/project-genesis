@@ -13,6 +13,6 @@ test('all technology and building resource requirements have a game-acquirable o
   assert.ok(RECIPES.some(r=>r.output.code==='glass'));
 });
 test('eleven mineable resource nodes provide nonzero yields',()=>{
-  assert.equal(Object.keys(RESOURCE_NODES).length,11);
+  assert.equal(Object.keys(RESOURCE_NODES).length,15);
   for(const [key,r]of Object.entries(RESOURCE_NODES))assert.ok(r.limit>0&&r.days>=1&&r.name&&r.code===key);
 });

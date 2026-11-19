@@ -97,6 +97,6 @@ test('v1.2.2 industry context reuses the network snapshot and preserves catalog 
   assert.equal(context.available,true);
   assert.equal(context.buildings.find(b=>b.id==='bench').built,1);
   assert.equal(context.buildings.find(b=>b.id==='bench').legacyUnmapped,0);
-  assert.equal(context.craft.length,41);
+  assert.equal(context.craft.length,51);
   assert.ok(f.getReads()<20,'render should not repeatedly walk network geometry for identical stations');
 });

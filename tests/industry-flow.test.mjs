@@ -127,7 +127,7 @@ test('garden daily harvest is claimable only once per day',async()=>{
 test('production context reflects unlocked items, machine, buildings and jobs',async()=>{
   const x=setup({stock:[['fiber',1]]});
   const view=industryContext(x.colony,game.user);
-  assert.equal(view.available,true);assert.equal(view.craft.length,41);
+  assert.equal(view.available,true);assert.equal(view.craft.length,51);
   assert.equal(view.buildings.length,14);
   assert.equal(view.craft.find(r=>r.id==='field-notes').canQueue,true);
   assert.equal(view.craft.find(r=>r.id==='stone-kit').canQueue,false);
