@@ -11,7 +11,9 @@ export const BUILDING_FOOTPRINTS = Object.freeze({
 });
 const SYSTEM='project-genesis';
 export const BASE_TILE = `systems/${SYSTEM}/assets/buildings/`;
-export const tileAsset=(id,finished=false)=>finished&&id==='shelter'?`${BASE_TILE}shelter-roof.png`:
+export const tileAsset=(id,finished=false)=>
+  finished&&id==='shelter'?`${BASE_TILE}shelter-roof.png`:
+  finished&&id==='bench'?`${BASE_TILE}bench-top.png`:
   `${BASE_TILE}${finished?id:'construction-site'}.svg`;
 export const cellsFor=(id)=>BUILDING_FOOTPRINTS[id]||null;
 export function sceneGeometry(scene){

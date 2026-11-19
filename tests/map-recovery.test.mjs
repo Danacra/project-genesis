@@ -61,7 +61,7 @@ test('existing tile is not duplicated by a repair request',async()=>{
   assert.equal(s.notifications.at(-1).ok,false);
   assert.equal(s.tiles.length,1);
 });
-test('move/resize of a tile blocks completion and cancel, preserving materials and queue',async()=>{
+test('move/resize of a tile blocks completion but GM can cancel and recover materials',async()=>{
   const s=setup();await s.place();s.tiles[0].x+=100;
   assert.equal(placementHealth(s.saved(),s.scene,s.tiles[0]),'moved-tile');
   const ctx=industryContext(s.colony,game.user);
@@ -71,9 +71,10 @@ test('move/resize of a tile blocks completion and cancel, preserving materials a
   await s.run('complete-building',{jobId:s.saved().jobId});
   assert.equal(s.notifications.at(-1).ok,false);
   await s.run('cancel',{queue:'construction',jobId:s.saved().jobId});
-  assert.equal(s.notifications.at(-1).ok,false);
-  assert.equal(s.colony.system.industry.construction.length,1);
-  assert.equal(s.items.get('wood').system.quantity,12);
+  assert.equal(s.notifications.at(-1).ok,true);
+  assert.equal(s.colony.system.industry.construction.length,0);
+  assert.equal(s.tiles.length,0);
+  assert.equal(s.items.get('wood').system.quantity,15);
 });
 test('repair refuses a position occupied since the original tile was removed',async()=>{
   const s=setup();await s.place();const p=s.saved();s.tiles.splice(0,1);

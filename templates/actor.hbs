@@ -18,6 +18,7 @@
           <option value="crew">Экипаж и логистика</option>
           <option value="mission">Космическая программа</option>
           <option value="history">Журнал операций</option>
+          <option value="library">Библиотека</option>
         </select>
       </label>
       <button type="button" class="genesis-header-inventory" data-genesis-open-tab="inventory">{{#if isColony}}Общий склад{{else}}Инвентарь{{/if}}</button>
@@ -37,8 +38,10 @@
     <button type="button" data-genesis-tab="crew" role="tab">Экипаж и логистика</button>
     <button type="button" data-genesis-tab="mission" role="tab">Корабль</button>
     <button type="button" data-genesis-tab="history" role="tab">Журнал операций</button>
+    <button type="button" data-genesis-tab="library" role="tab">Библиотека</button>
   </div>
   <div class="genesis-content" data-genesis-page="overview">
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="start">? С чего начать</button></div>
     {{#if isColony}}
       <div class="genesis-panel"><h2>Колония</h2><div class="genesis-form-grid">
         <label>Биом<input data-genesis-field="biome" value="{{actor.system.biome}}" {{#unless editable}}disabled{{/unless}}></label>
@@ -80,6 +83,7 @@
     <div class="genesis-panel"><h2>Журнал исследователя</h2><textarea data-genesis-field="notes" rows="3" placeholder="Открытия, важные наблюдения, задачи..." {{#unless editable}}disabled{{/unless}}>{{actor.system.notes}}</textarea></div>
   </div>
   <div class="genesis-content" data-genesis-page="inventory" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="inventory">? Как устроен инвентарь</button></div>
     <div class="genesis-toolbar"><div><h2>{{#if isColony}}Общий склад колонии{{else}}Личный инвентарь выжившего{{/if}}</h2><p class="genesis-muted">Материалы и оборудование · учёт массы и объёма</p></div>
       {{#if editable}}<button type="button" data-genesis-action="create" class="genesis-primary">+ Добавить предмет</button>{{/if}}</div>
     <div class="genesis-capacity"><span><strong>{{load.mass}}</strong> / {{cap.mass}} кг</span><span><strong>{{load.volume}}</strong> / {{cap.volume}} л</span><span>{{totalItems}} ед.</span></div>
@@ -89,6 +93,7 @@
     </tbody></table></div>
   </div>
   <div class="genesis-content" data-genesis-page="containers" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="inventory">? Как устроены хранилища</button></div>
     <div class="genesis-toolbar"><div><h2>Хранилища и контейнеры</h2><p class="genesis-muted">Нельзя вложить контейнер в другой контейнер</p></div>
       {{#if editable}}<button type="button" data-genesis-action="container" class="genesis-primary">+ Создать контейнер</button>{{/if}}</div>
     <div class="genesis-container-grid"><article class="genesis-container-card"><h3>Основной отсек</h3><div>{{load.mass}} / {{cap.mass}} кг</div><div>{{load.volume}} / {{cap.volume}} л</div></article>
@@ -96,6 +101,7 @@
     <p class="genesis-footnote">Для перемещения в контейнер откройте вкладку «Инвентарь» и нажмите ⇢ напротив предмета.</p>
   </div>
   <div class="genesis-content genesis-research-page" data-genesis-page="research" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="research">? Как проводить исследования</button></div>
     {{#if research.available}}
       <div class="genesis-research-header">
         <div><span class="genesis-kicker">PROJECT GENESIS / SCIENCE & DISCOVERY</span><h2>Древо технологий</h2>
@@ -240,6 +246,7 @@
     {{/if}}
   </div>
   <div class="genesis-content" data-genesis-page="blueprints" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="blueprints">? Как работают чертежи</button></div>
     {{#if research.available}}
       <div class="genesis-toolbar"><div><h2>Каталог чертежей</h2><p class="genesis-muted">Открытые чертежи можно изготовить в разделе «Производство», если на базе есть нужный станок и ресурсы.</p></div></div>
       <div class="genesis-recipe-grid">{{#each research.recipes}}
@@ -248,6 +255,7 @@
     {{else}}<p>Сначала создайте колонию.</p>{{/if}}
   </div>
   <div class="genesis-content genesis-industry-page" data-genesis-page="production" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="blueprints">? Как работает крафт</button></div>
     {{#if industry.available}}
     <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / MANUFACTURING</span><h2>Производственные цепочки</h2>
       <p class="genesis-muted">Для локального производства нажмите на станок на карте и выберите источник ресурсов. Для общего производства используйте кнопку в каталоге. Материалы списываются при запуске. Время считается по суткам экспедиции. Получение продукции — отдельное действие после окончания работы.</p></div>
@@ -277,6 +285,7 @@
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Создайте актора типа «Колония», чтобы использовать общий производственный комплекс.</p></div>{{/if}}
   </div>
   <div class="genesis-content genesis-industry-page" data-genesis-page="construction" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="building">? Как строить здания</button></div>
     {{#if industry.available}}
     <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / COLONY DEVELOPMENT</span><h2>Строительство базы</h2>
       <p class="genesis-muted">Постройка станции добавляет её в инфраструктуру исследований и производства. «Складской модуль» расширяет общий склад, а новый «Локальный склад» имеет собственные 750 кг / 1500 л. Новые стройки размещаются на квадратной сетке локальной сцены.</p></div>
@@ -328,6 +337,7 @@
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Ведущий должен создать актора типа «Колония».</p></div>{{/if}}
   </div>
   <div class="genesis-content genesis-industry-page" data-genesis-page="networks" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="networks">? Как подключать сети</button></div>
     {{#if networks.available}}
     <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / UTILITY NETWORKS</span><h2>Энергетика и инженерные сети</h2>
       <p class="genesis-muted">Подключайте уже построенные здания кабелями и трубопроводами непосредственно на сцене. Маршрут обходится по свободным клеткам и отображается цветными тайлами. Баланс рассчитывается отдельно для каждой связанной группы.</p></div>
@@ -376,6 +386,7 @@
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Создайте актора «Колония».</p></div>{{/if}}
   </div>
   <div class="genesis-content" data-genesis-page="planet" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="planet">? О погоде</button></div>
     {{#if planet.available}}
     <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / PLANETARY ENVIRONMENT</span>
       <h2>Планета и погодные условия</h2><p class="genesis-muted">Погода детерминирована по игровым суткам и выбранному биому. Эффекты применяются только при переходе суток.</p></div></div>
@@ -388,6 +399,7 @@
     {{else}}<p>Сначала создайте колонию.</p>{{/if}}
   </div>
   <div class="genesis-content genesis-crew-page" data-genesis-page="crew" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="gathering">? Как добывать ресурсы</button></div>
     {{#if crew.available}}
       <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / CREW & LOGISTICS</span>
         <h2>Экипаж и логистика</h2><p class="genesis-muted">Планета необитаема: вся работа выполняется выжившими. Месторождения существуют на карте, товары не телепортируются в хранилище. Для новых операций нужен ведущий онлайн.</p></div></div>
@@ -435,6 +447,7 @@
     {{else}}<div class="genesis-panel"><h2>Нет колонии</h2><p>Создайте актора «Колония».</p></div>{{/if}}
   </div>
   <div class="genesis-content" data-genesis-page="mission" hidden>
+    <div class="genesis-library-shortcut"><button type="button" data-genesis-help-open="mission">? Цель экспедиции</button></div>
     {{#if mission.available}}
       <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / PROJECT RETURN</span>
         <h2>Космическая программа «Возвращение»</h2><p class="genesis-muted">От исследования к сборке космического корабля и финалу кампании.</p></div>
@@ -462,6 +475,38 @@
   <div class="genesis-content" data-genesis-page="history" hidden>
     <h2>Логистика экспедиции</h2><p class="genesis-muted">Последние 25 подтверждённых перемещений · доступно игрокам и ведущему</p>
     <div class="genesis-log">{{#each journal}}<article><span>День {{day}}</span><strong>{{quantity}} × {{item}}</strong><small>{{from}} → {{to}} · {{location}} · {{user}}</small></article>{{else}}<div class="genesis-empty">Операций пока нет.</div>{{/each}}</div>
+  </div>
+  <div class="genesis-content genesis-library-page" data-genesis-page="library" hidden>
+    <div class="genesis-library-header">
+      <div><span class="genesis-kicker">PROJECT GENESIS / FIELD MANUAL</span><h2>Библиотека экспедиции</h2>
+      <p class="genesis-muted">Руководство для игроков{{#if isGM}} и инструменты ведущего{{/if}}. {{library.chapterCount}} разделов.</p></div>
+      <div class="genesis-library-search-wrap"><label>Поиск по руководству<input data-genesis-library-search type="search" placeholder="Например, энергия, склад, отдых…" autocomplete="off"></label></div>
+    </div>
+    <div class="genesis-library-layout">
+      <aside class="genesis-library-index" aria-label="Содержание библиотеки" role="tablist">
+        {{#each library.chapters}}
+          <button type="button" role="tab" data-genesis-library-chapter="{{id}}" aria-selected="false" class="genesis-library-index-item">
+            <span class="genesis-library-index-group">{{group}}</span><strong>{{title}}</strong>
+          </button>
+        {{/each}}
+        <p data-genesis-library-empty hidden class="genesis-muted">По этому запросу статей не найдено.</p>
+      </aside>
+      <div class="genesis-library-reader" aria-live="polite">
+        {{#each library.chapters}}
+          <article data-genesis-library-article="{{id}}" hidden class="genesis-library-article">
+            <span class="genesis-kicker">{{group}}</span>
+            <h3>{{title}}</h3><p class="genesis-library-intro">{{description}}</p>
+            {{#each sections}}
+              <section class="genesis-library-section">
+                <h4>{{title}}</h4>
+                {{#if text}}<p>{{text}}</p>{{/if}}
+                {{#if steps}}<ol>{{#each steps}}<li>{{this}}</li>{{/each}}</ol>{{/if}}
+              </section>
+            {{/each}}
+          </article>
+        {{/each}}
+      </div>
+    </div>
   </div>
   <footer class="genesis-footer">PG / SYSTEM {{systemVersion}} <span>EXPLORE · RESEARCH · REBUILD</span></footer>
 </section>

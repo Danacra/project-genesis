@@ -1,3 +1,4 @@
+import {libraryContext} from './library.mjs';
 import { ABILITIES, SKILLS, ITEM_TYPES, measure, capacity, containerCapacity, itemLoad,
   perQuantity, plus, fits, round, qty, checkResult, summarizeInventory } from './rules.mjs';
 import { requestTransfer, recentOperations, advanceDay } from './logistics.mjs';
@@ -373,7 +374,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     form:{submitOnChange:false,closeOnSubmit:false},
     actions:{editImage:this.editImage}};
   static PARTS={body:{template:'systems/project-genesis/templates/actor.hbs'}};
-  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._subtreeOpen=false;this._subtechSelected='survey-landing';}
+  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._subtreeOpen=false;this._subtechSelected='survey-landing';this._libraryChapter='start';}
   async _prepareContext(options){
     const ctx=await super._prepareContext(options),actor=this.document;
     const cap=capacity(actor),inventory=summarizeInventory(actor.items),load=inventory.load;
@@ -391,6 +392,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       journal:recentOperations().slice(0,25),
       colony,
       tab:this._genesisTab,systemVersion:game.system.version,
+      library:libraryContext(game.user.isGM),
       planet:planetContext(colony,worldDay),
       rest:{...restContext(actor,colony,worldDay),canAct:actor.isOwner},
       mission:{...missionStage(colony,worldDay),
@@ -417,7 +419,20 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       });
       root.querySelectorAll('[data-genesis-quick-nav]').forEach(el=>{el.value=name;});
     };
+    const selectLibraryChapter=(id)=>{
+      const articles=[...root.querySelectorAll('[data-genesis-library-article]')];
+      const found=articles.find(a=>a.dataset.genesisLibraryArticle===id);
+      if(!found)return;
+      this._libraryChapter=id;
+      articles.forEach(a=>{a.hidden=a!==found;});
+      root.querySelectorAll('[data-genesis-library-chapter]').forEach(b=>{
+        const selected=b.dataset.genesisLibraryChapter===id;
+        b.classList.toggle('is-active',selected);
+        b.setAttribute('aria-selected',String(selected));
+      });
+    };
     selectTab(this._genesisTab);
+    selectLibraryChapter(this._libraryChapter);
     const board=root.querySelector('[data-genesis-tech-board]');
     const applyView=()=>{
       if(!board)return;
@@ -458,6 +473,20 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     root.querySelector('[data-genesis-tech-search]')?.addEventListener('input',event=>{
       this._techQuery=event.target.value;applyView();
     },eventOptions);
+    root.querySelector('[data-genesis-library-search]')?.addEventListener('input',event=>{
+      const query=String(event.target.value||'').trim().toLocaleLowerCase();
+      const visible=[];
+      for(const button of root.querySelectorAll('[data-genesis-library-chapter]')){
+        const id=button.dataset.genesisLibraryChapter;
+        const article=root.querySelector(`[data-genesis-library-article="${id}"]`);
+        const match=!query||(button.textContent+' '+(article?.textContent||'')).toLocaleLowerCase().includes(query);
+        button.hidden=!match;
+        if(match)visible.push(id);
+      }
+      root.querySelector('[data-genesis-library-empty]')?.toggleAttribute('hidden',visible.length>0);
+      if(visible.length)selectLibraryChapter(visible.includes(this._libraryChapter)?this._libraryChapter:visible[0]);
+      else root.querySelectorAll('[data-genesis-library-article]').forEach(article=>{article.hidden=true;});
+    },eventOptions);
     // One delegated handler per event type instead of O(number of items) listeners.
     root.addEventListener('change',event=>{
       const quickNav=event.target.closest?.('[data-genesis-quick-nav]');
@@ -495,6 +524,16 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
         if(root.querySelector(`[data-genesis-page="${target}"]`)) selectTab(target);
         return;
       }
+      const help=event.target.closest?.('[data-genesis-help-open]');
+      if(help){
+        selectTab('library');
+        const search=root.querySelector('[data-genesis-library-search]');
+        if(search){search.value='';search.dispatchEvent(new Event('input'));}
+        selectLibraryChapter(help.dataset.genesisHelpOpen);
+        return;
+      }
+      const chapter=event.target.closest?.('[data-genesis-library-chapter]');
+      if(chapter&&!chapter.hidden){selectLibraryChapter(chapter.dataset.genesisLibraryChapter);return;}
       const tab=event.target.closest?.('[data-genesis-tab]');
       if (tab) {selectTab(tab.dataset.genesisTab);if(tab.dataset.genesisTab==='research')applyView();return;}
       const techCard=event.target.closest?.('[data-genesis-tech-card]');

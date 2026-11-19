@@ -99,7 +99,7 @@ test('day advancement and completion change tile and activate technology facilit
   await advanceIndustryDay(s.colony);
   await run('complete-building',{jobId:job.id});
   assert.equal(s.scene.tiles.length,1);
-  assert.match(s.scene.tiles[0].texture.src,/bench\.svg$/);
+  assert.match(s.scene.tiles[0].texture.src,/bench-top\.png$/);
   assert.equal(s.scene.tiles[0].flags['project-genesis'].status,'finished');
   assert.equal(s.colony.system.industry.placements[0].status,'finished');
   assert.equal(s.colony.system.industry.buildings[0].count,1);
@@ -160,7 +160,7 @@ test('existing v0.5 building can be added to map exactly once at no resource cos
   assert.equal(s.messages.at(-1).ok,true);
   assert.equal(s.colony.system.industry.buildings[0].count,1);
   assert.equal(s.colony.system.industry.placements.length,1);
-  assert.match(s.scene.tiles[0].texture.src,/bench\.svg$/);
+  assert.match(s.scene.tiles[0].texture.src,/bench-top\.png$/);
   assert.equal(s.scene.tiles[0].flags['project-genesis'].status,'finished');
   await run('place-existing',{subject:'bench',sceneId:'scene1',x:900,y:200});
   assert.equal(s.messages.at(-1).ok,false);
@@ -252,4 +252,144 @@ test('v1.2: clicking a specific built station can only start its own recipe',asy
   await run('start-recipe',{subject:'field-notes',amount:1,stationPlacementId:p.id});
   assert.equal(s.messages.at(-1).ok,false);
   assert.match(s.messages.at(-1).message,/станок/);
+});
+
+test('v1.3.3: GM can freely place several identical buildings; ordinary limit still applies',async()=>{
+  const s=setup({materials:[],tech:[]});
+  for(const x of [100,400,700]){
+    await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x,y:100});
+    assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  }
+  assert.equal(s.colony.system.industry.buildings.find(b=>b.id==='bench').count,3);
+  assert.equal(s.scene.tiles.length,3);
+  assert.equal(s.colony.system.industry.placements.length,3);
+  const context=industryContext(s.colony,game.user);
+  assert.equal(context.buildings.find(b=>b.id==='bench').canGMInstant,true);
+  s.colony.system.science.unlocked.push('stone-tools');
+  await run('start-building',{subject:'bench',sceneId:'scene1',x:1100,y:100});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.match(s.messages.at(-1).message,/лимит/);
+});
+test('v1.3.3: GM free structures cannot be farmed for materials',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+  const id=s.colony.system.industry.placements[0].id;
+  await run('dismantle',{placementId:id,mode:'salvage'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.match(s.messages.at(-1).message,/бесплатно/);
+  assert.equal(s.scene.tiles.length,1);
+  assert.equal(s.items.length,0);
+  const ctx=industryContext(s.colony,game.user).placements[0];
+  assert.equal(ctx.canErase,true);
+  assert.equal(ctx.canDismantle,false);
+  await run('dismantle',{placementId:id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.scene.tiles.length,0);
+  assert.equal(s.colony.system.industry.placements.length,0);
+  assert.equal(s.items.length,0);
+});
+test('v1.3.3: GM can erase a building after its Tile is missing, without affecting materials',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+  const id=s.colony.system.industry.placements[0].id;
+  s.scene.tiles.splice(0,1);
+  const ctx=industryContext(s.colony,game.user).placements[0];
+  assert.equal(ctx.canErase,true);
+  assert.equal(ctx.canDismantle,false);
+  assert.equal(ctx.mapProblem,'Тайл отсутствует');
+  await run('dismantle',{placementId:id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.colony.system.industry.buildings.length,0);
+  assert.equal(s.colony.system.industry.placements.length,0);
+});
+test('v1.3.3: GM erase does not delete a foreign Tile, even when placement record points to it',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+  const id=s.colony.system.industry.placements[0].id;
+  s.scene.tiles[0].flags['project-genesis'].placementId='some-other-building';
+  await run('dismantle',{placementId:id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.scene.tiles.length,1);
+  assert.equal(s.colony.system.industry.placements.length,0);
+});
+test('v1.3.3: GM can erase a building if the entire scene has been removed',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+  const id=s.colony.system.industry.placements[0].id;
+  game.scenes.get=()=>null;
+  const ctx=industryContext(s.colony,game.user).placements[0];
+  assert.equal(ctx.canErase,true);
+  assert.equal(ctx.mapProblem,'Сцена удалена');
+  await run('dismantle',{placementId:id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.colony.system.industry.placements.length,0);
+});
+test('v1.3.3: moved but owned Tile can still be erased by GM',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x:100,y:100});
+  const id=s.colony.system.industry.placements[0].id;
+  s.scene.tiles[0].x=200;
+  await run('dismantle',{placementId:id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.scene.tiles.length,0);
+});
+test('v1.3.3: automatically managed ceiling light does not block deletion of an empty room',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'shelter',sceneId:'scene1',x:100,y:100});
+  const p=s.colony.system.industry.placements[0];
+  p.interiorSceneId='int-133';
+  let deleted=false;
+  const room={id:'int-133',lights:[{flags:{'project-genesis':{managedInteriorLight:true,placementId:p.id}}}],
+    tiles:[],tokens:[],walls:[],drawings:[],sounds:[],notes:[],templates:[],regions:[],
+    async delete(){deleted=true;}};
+  const get=game.scenes.get;
+  game.scenes.get=id=>id===room.id?room:get(id);
+  await run('dismantle',{placementId:p.id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(deleted,true);
+  assert.equal(s.colony.system.industry.placements.length,0);
+});
+test('v1.3.3: user-created lights and occupied rooms remain protected',async()=>{
+  const s=setup({materials:[]});
+  await run('gm-instant-build',{subject:'shelter',sceneId:'scene1',x:100,y:100});
+  const p=s.colony.system.industry.placements[0];
+  p.interiorSceneId='int-134';
+  const room={id:'int-134',lights:[{flags:{}}],tiles:[],tokens:[],walls:[],drawings:[],sounds:[],notes:[],templates:[],regions:[],async delete(){throw Error('should stay');}};
+  const get=game.scenes.get;game.scenes.get=id=>id===room.id?room:get(id);
+  await run('dismantle',{placementId:p.id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.match(s.messages.at(-1).message,/вручную/);
+  assert.equal(s.colony.system.industry.placements.length,1);
+  room.lights=[];room.tokens=[{id:'player'}];
+  await run('dismantle',{placementId:p.id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.colony.system.industry.placements.length,1);
+});
+
+test('v1.3.3: GM can cancel a broken construction site and safely refund the reserved stock',async()=>{
+  const s=setup();
+  await place();
+  assert.equal(s.colony.system.industry.placements.length,1);
+  const job=s.colony.system.industry.construction[0];
+  s.scene.tiles.splice(0,1);
+  assert.equal(industryContext(s.colony,game.user).placements[0].canCancelSite,true);
+  await run('cancel',{jobId:job.id,queue:'construction'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.colony.system.industry.placements.length,0);
+  assert.equal(s.colony.system.industry.construction.length,0);
+  assert.equal(s.items.find(i=>i.system.resourceCode==='wood').system.quantity,15);
+});
+
+test('v1.3.3: deleting one of multiple identical GM buildings preserves the remaining station',async()=>{
+  const s=setup({materials:[]});
+  for(const x of [100,400,700])await run('gm-instant-build',{subject:'bench',sceneId:'scene1',x,y:100});
+  const ids=s.colony.system.industry.placements.map(p=>p.id);
+  for(let i=0;i<ids.length;i++){
+    await run('dismantle',{placementId:ids[i],mode:'erase'});
+    assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+    assert.equal(s.colony.system.industry.placements.length,2-i);
+    assert.equal(s.scene.tiles.length,2-i);
+    assert.equal(s.colony.system.industry.buildings.find(x=>x.id==='bench')?.count||0,2-i);
+    assert.equal(s.colony.system.science.facilities.includes('bench'),i<2);
+  }
 });

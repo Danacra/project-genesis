@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {requestNetwork,getNetworkSimulation,stationOperational,networkContext} from '../module/networks.mjs';
+import {requestNetwork,getNetworkSimulation,stationOperational,networkContext,initializeNetworks} from '../module/networks.mjs';
 import {networkCost} from '../module/network-rules.mjs';
 const clone=structuredClone;
 let serial=0;
 function setup({copper=30,alloy=15,colonyError='',sceneError='',nonGM=false}={}){
   const gm={id:'gm',active:true,isGM:true,name:'GM'};
   const player={id:'player',active:true,isGM:false,name:'Техник'};
-  const messages=[];
+  const messages=[],responses=[],socketHandlers=new Map();
   const items=[['copper',copper],['alloy',alloy]].map(([code,quantity])=>({id:`item-${code}`,name:code,
     type:'material',img:'icons/svg/item-bag.svg',system:{quantity,unitMass:1,unitVolume:1,
     resourceCode:code,quality:0,techTier:0,description:'',containerId:''}}));
@@ -42,9 +42,9 @@ function setup({copper=30,alloy=15,colonyError='',sceneError='',nonGM=false}={})
     users:Object.assign(users,{get:id=>users.find(u=>u.id===id)}),
     actors:{get:id=>id===colony.id?colony:null,some:fn=>actors.some(fn),find:fn=>actors.find(fn)},
     scenes:{get:id=>id===scene.id?scene:null},
-    socket:{emit:()=>{}},settings:{get:()=>1}};
+    socket:{emit:(_channel,message)=>responses.push(message),on:(channel,fn)=>socketHandlers.set(channel,fn)},settings:{get:()=>1}};
   globalThis.ui={notifications:{info:x=>messages.push({ok:true,x}),error:x=>messages.push({ok:false,x})}};
-  return {colony,scene,items,tiles,messages,gm,player};
+  return {colony,scene,items,tiles,messages,gm,player,responses,socketHandlers};
 }
 const run=(action,details={})=>requestNetwork({action,colonyId:'base',...details});
 const connect=(type='power',fromId='gen',toId='lab')=>run('connect',{type,fromId,toId});
@@ -192,4 +192,69 @@ test('missing replacement material prevents repair without creating extra tiles'
   await run('maintain',{linkId:link.id});
   assert.equal(s.messages.at(-1).ok,false);
   assert.equal(s.tiles.length,count);
+});
+
+// v1.3.4 — GM-only free network construction and persisted provenance.
+test('GM power cable with zero copper saves a permanent free-build marker',async()=>{
+  const s=setup({copper:0,alloy:0});
+  await run('gm-connect',{type:'power',fromId:'gen',toId:'lab'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).x);
+  assert.equal(s.colony.system.infrastructure.links.length,1);
+  const link=s.colony.system.infrastructure.links[0];
+  assert.equal(link.gmFree,true);
+  assert.ok(link.tileIds.every(id=>s.scene.tiles.get(id).flags['project-genesis'].gmFree===true));
+  assert.equal(s.items.get('item-copper').system.quantity,0);
+  assert.equal(getNetworkSimulation(s.colony).statuses[link.id],'ok');
+  assert.equal(networkContext(s.colony,s.gm).links[0].gmFree,true);
+});
+test('GM can lay free water pipe manually with no alloys',async()=>{
+  const s=setup({copper:0,alloy:0});
+  const route=[{x:300,y:100},{x:400,y:100},{x:500,y:100}];
+  await run('gm-connect',{type:'water',fromId:'gen',toId:'lab',route});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).x);
+  assert.deepEqual(s.colony.system.infrastructure.links[0].route,route);
+  assert.equal(s.colony.system.infrastructure.links[0].gmFree,true);
+  assert.equal(s.items.get('item-alloy').system.quantity,0);
+});
+test('ordinary networks stay paid and are never marked GM-built',async()=>{
+  const s=setup();await connect('water');
+  assert.equal(s.colony.system.infrastructure.links[0].gmFree,false);
+  assert.ok(s.items.get('item-alloy').system.quantity<15);
+});
+test('free GM cable creation rolls back all tiles if saving colony fails',async()=>{
+  const s=setup({copper:0,colonyError:'cannot save'});
+  await run('gm-connect',{type:'power',fromId:'gen',toId:'lab'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.tiles.length,3);
+  assert.equal(s.colony.system.infrastructure.links.length,0);
+  assert.equal(s.items.get('item-copper').system.quantity,0);
+});
+test('manual free GM line still refuses a malformed route without modifications',async()=>{
+  const s=setup({copper:0});
+  await run('gm-connect',{type:'power',fromId:'gen',toId:'lab',route:[{x:300,y:100},{x:500,y:100}]});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.tiles.length,3);
+});
+test('authenticated non-GM socket request cannot forge free engineering works',async()=>{
+  const s=setup({copper:0});
+  initializeNetworks();
+  const request={kind:'genesis-network-request',id:'1234567890AB',userId:s.player.id,
+    colonyId:'base',action:'gm-connect',type:'power',fromId:'gen',toId:'lab'};
+  s.socketHandlers.get('system.project-genesis')(request,s.player.id);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(s.responses.length,1);
+  assert.equal(s.responses[0].ok,false);
+  assert.match(s.responses[0].message,/только ведущему/);
+  assert.equal(s.colony.system.infrastructure.links.length,0);
+  assert.equal(s.tiles.length,3);
+});
+test('socket sender spoof is dropped even if GM id appears in payload',async()=>{
+  const s=setup({copper:0});
+  initializeNetworks();
+  s.socketHandlers.get('system.project-genesis')({kind:'genesis-network-request',
+    id:'1234567890AC',userId:s.gm.id,colonyId:'base',action:'gm-connect',
+    type:'power',fromId:'gen',toId:'lab'},s.player.id);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(s.responses.length,0);
+  assert.equal(s.colony.system.infrastructure.links.length,0);
 });
