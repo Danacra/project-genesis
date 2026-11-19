@@ -22,7 +22,7 @@ const makeReservation = () => new SchemaField({
 const makeIndustryJob = () => new SchemaField({
   id:text(''),subject:text(''),name:text(''),amount:int(1,1,10),remaining:int(0,0,1000),
   startedDay:int(0,0,9999999),createdBy:text(''),userId:text(''),
-  reserved:new ArrayField(makeReservation(),{initial:()=>[]})
+  sourcePlacementId:text(''),outputPlacementId:text(''),stationPlacementId:text(''),reserved:new ArrayField(makeReservation(),{initial:()=>[]})
 });
 export class ColonyData extends TypeDataModel {
   static defineSchema(){return {
@@ -41,7 +41,7 @@ export class ColonyData extends TypeDataModel {
       buildings:new ArrayField(new SchemaField({id:text(''),count:int(1,0,100),builtDay:int(0,0,9999999),lastClaimDay:int(0,0,9999999)}),{initial:()=>[]}),
       // 0.6 scene links, additive schema for existing 0.5 colonies.
       placements:new ArrayField(new SchemaField({
-        id:text(''),colonyId:text(''),buildingId:text(''),sceneId:text(''),tileId:text(''),jobId:text(''),
+        id:text(''),colonyId:text(''),buildingId:text(''),sceneId:text(''),tileId:text(''),jobId:text(''),interiorSceneId:text(''),
         x:int(0,0,10000000),y:int(0,0,10000000),width:int(1,1,10000000),height:int(1,1,10000000),
         status:text('construction'),createdDay:int(0,0,9999999),by:text('')
       }),{initial:()=>[]}),

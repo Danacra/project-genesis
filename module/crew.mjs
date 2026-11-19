@@ -6,6 +6,7 @@ import {RESOURCE_NODES,crewState,MAX_CREW_JOBS,MAX_NODES,MAX_CARGO,validActor,
   laborDays,journeyDays,validateCache,changeStock,snapNode,nodeHealth,stockFor,setStock,
   pointOf,nearby,formatCargo,packed,crewJob} from './crew-rules.mjs';
 import {BUILDING_BY_ID} from './industry-data.mjs';
+import {localWarehouseStatus} from './local-storage-rules.mjs';
 const SYSTEM='project-genesis',TIMEOUT=60_000;
 const pending=new Map(),handled=new Set();
 const arr=v=>Array.isArray(v)?v:[];
@@ -226,10 +227,10 @@ async function perform(request){
         response=`На площадку «${BUILDING_BY_ID[dest.buildingId]?.name||dest.buildingId}» доставлено ${cargo.name} ×${cargo.quantity}.`;
       }
     }
-  }else if(request.action==='remove-empty'){
+  }else if(request.action==='remove-empty'||request.action==='remove-node'){
     if(!user.isGM)throw Error('Удалять месторождения может только ведущий.');
     const {n,scene}=nodeFor(colony,request.nodeId);
-    if(n.remaining>0)throw Error('Можно убрать только полностью истощённое месторождение.');
+    if(request.action==='remove-empty'&&n.remaining>0)throw Error('Можно убрать только полностью истощённое месторождение.');
     if(arr(state.jobs).some(j=>j.sourceKind==='node'&&j.sourceId===n.id))throw Error('Месторождение участвует в задании.');
     const tile=scene.tiles.get(n.tileId)?.toObject();
     await scene.deleteEmbeddedDocuments('Tile',[n.tileId]);
@@ -240,7 +241,7 @@ async function perform(request){
       const restored=await scene.createEmbeddedDocuments('Tile',[{...tile,_id:n.tileId}],{keepId:true});
       if(restored[0]?.id!==n.tileId)throw Error('Новый тайл получил другой ID.');
     }catch(restore){console.error('GENESIS restore node failure',restore);throw Error('Проверьте карту: не удалось восстановить ресурсный тайл с прежним ID.');}throw error;}
-    response='Истощённое месторождение убрано с карты.';
+    response='Месторождение удалено с карты без изменения запасов и параметров персонажей.';
   }else throw Error('Неизвестная операция экспедиции.');
   handled.add(request.id);return response;
 }
@@ -255,13 +256,15 @@ export async function requestCrew(data){
   alert('Задание отправлено ведущему.');
 }
 export function initializeCrew(){
-  game.socket.on(`system.${SYSTEM}`,r=>{
+  game.socket.on(`system.${SYSTEM}`,(r,senderId)=>{
     if(r?.kind==='crew-result'){
       if(r.userId!==game.user.id||!pending.has(r.id))return;
       const timestamp=pending.get(r.id);pending.delete(r.id);
       if(Date.now()-timestamp<=TIMEOUT)alert(r.message,!r.ok);return;
     }
     if(r?.kind!=='crew-request'||!game.user.isGM||gmLeader()?.id!==game.user.id)return;
+    if(typeof senderId==='string'&&senderId&&senderId!==r.userId)return;
+    if(typeof r.userId!=='string'||typeof r.id!=='string'||typeof r.colonyId!=='string')return;
     withWorldLock(()=>perform(r)).then(message=>game.socket.emit(`system.${SYSTEM}`,
       {kind:'crew-result',userId:r.userId,id:r.id,ok:true,message}))
       .catch(error=>game.socket.emit(`system.${SYSTEM}`,
@@ -283,9 +286,9 @@ export function crewContext(actor,user){
   const survivors=game.actors.filter(a=>a.type==='survivor'&&owner(a));
   const sites=placements.map(p=>({id:p.id,buildingId:p.buildingId,name:BUILDING_BY_ID[p.buildingId]?.name||p.buildingId,
     sceneName:game.scenes.get(p.sceneId)?.name||'Сцена удалена',sceneId:p.sceneId,x:p.x,y:p.y,
-    isStorehouse:p.buildingId==='storehouse',status:p.status,
+    isStorehouse:p.buildingId==='storehouse',isLocalStore:p.buildingId==='local-store',status:p.status,
     stock:stockFor(state,p.id).map(r=>({name:r.name,code:r.code,quantity:r.quantity})),
-    load:stockFor(state,p.id).reduce((sum,r)=>sum+r.quantity*r.unitMass,0)}));
+    ...localWarehouseStatus(stockFor(state,p.id),p)}));
   const jobs=arr(state.jobs).map(j=>({id:j.id,actor:game.actors.get(j.actorId)?.name||'Неизвестный',
     name:j.cargo.name,quantity:j.cargo.quantity,remaining:j.remaining,ready:j.remaining===0,
     canAct:!!(user?.isGM||game.actors.get(j.actorId)?.testUserPermission(user,'OWNER')),
@@ -295,7 +298,7 @@ export function crewContext(actor,user){
     resourceTypes:Object.entries(RESOURCE_NODES).map(([id,r])=>({id,name:r.name})),
     survivors:survivors.map(a=>({id:a.id,name:a.name,busy:arr(state.jobs).some(j=>j.actorId===a.id)})),
     nodes:arr(state.nodes).map(n=>({...n,sceneName:game.scenes.get(n.sceneId)?.name||'Сцена удалена',
-      health:nodeHealth(n,game.scenes.get(n.sceneId)),canRemove:!!user?.isGM&&n.remaining===0})),
+      health:nodeHealth(n,game.scenes.get(n.sceneId)),canRemove:!!user?.isGM,canRemoveEmpty:!!user?.isGM&&n.remaining===0})),
     sites,jobs,history:arr(state.history).slice(0,30)};
 }
 export {RESOURCE_NODES};

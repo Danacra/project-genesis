@@ -1,16 +1,19 @@
 import { ABILITIES, SKILLS, ITEM_TYPES, measure, capacity, containerCapacity, itemLoad,
   perQuantity, plus, fits, round, qty, checkResult, summarizeInventory } from './rules.mjs';
 import { requestTransfer, recentOperations, advanceDay } from './logistics.mjs';
-import { researchContext, colonyFor, requestResearch, TECHNOLOGIES } from './research.mjs';
+import { researchContext, colonyFor, requestResearch, TECHNOLOGIES, FIELD_STUDIES } from './research.mjs';
 import {planetContext,PLANET_ZONES} from './planet.mjs';
 import {restContext,requestRest} from './rest.mjs';
 import {missionStage,requestMission} from './mission.mjs';
 import { industryContext, requestIndustry } from './industry.mjs';
 import { startPlacement, showPlacementOnScene } from './map-placement.mjs';
-import { networkContext, requestNetwork } from './networks.mjs';
+import { networkContext, requestNetwork, getNetworkSimulation } from './networks.mjs';
 import {startNetworkDrawing} from './network-drawing.mjs';
 import {crewContext,requestCrew,RESOURCE_NODES} from './crew.mjs';
 import {startResourcePlacement} from './crew-placement.mjs';
+import {enterRoom,openStationCraft} from './building-interactions.mjs';
+import {salvageFor} from './structure-rules.mjs';
+import {BUILDING_BY_ID,resourceName} from './industry-data.mjs';
 const {HandlebarsApplicationMixin} = foundry.applications.api;
 const {ActorSheetV2,ItemSheetV2} = foundry.applications.sheets;
 const Dialog = foundry.applications.api.DialogV2;
@@ -140,7 +143,7 @@ async function askResearch(sheet,action,techId='',facilityId='') {
   }
   if(action==='invest'||action==='grant') {
     const max=action==='grant'?1000:Math.min(Number(colony.system.science.points),
-      (TECHNOLOGIES.find(t=>t.id===techId)?.rp || 0)-((colony.system.science.projects||[]).find(p=>p.id===techId)?.invested || 0));
+      ([...TECHNOLOGIES,...FIELD_STUDIES].find(t=>t.id===techId)?.rp || 0)-((colony.system.science.projects||[]).find(p=>p.id===techId)?.invested || 0));
     if(action==='invest' && max<1){ui.notifications.warn('Недостаточно свободных очков или проект уже профинансирован.');return;}
     let amount;
     try{amount=await Dialog.prompt({window:{title:action==='grant'?'Начислить очки (GM)':'Вложить очки в проект'},
@@ -209,10 +212,26 @@ async function askIndustry(sheet,el){
     if(count==null)return;
     details.amount=count;
   }
+  if(action==='dismantle'){
+    if(!game.user.isGM)return ui.notifications.warn('Удалять готовые здания может только ведущий.');
+    const placement=(colony.system.industry?.placements||[]).find(p=>p.id===el.dataset.placementId);
+    if(!placement)return ui.notifications.warn('Постройка не найдена.');
+    const mode=el.dataset.dismantleMode==='erase'?'erase':'salvage';
+    const materials=salvageFor(placement.buildingId);
+    const preview=Object.entries(materials).map(([code,count])=>`${esc(resourceName(code))} ×${count}`).join(', ')||'Нет пригодных материалов';
+    let confirmed=false;
+    try{confirmed=await Dialog.confirm({window:{title:mode==='erase'?'Удалить без возврата?':'Разобрать постройку?'},
+      content:mode==='erase'?`<p>Административно удалить «${esc(BUILDING_BY_ID[placement.buildingId]?.name||placement.buildingId)}» без возврата ресурсов?</p>`:
+        `<p>Разобрать «${esc(BUILDING_BY_ID[placement.buildingId]?.name||placement.buildingId)}»?</p><p>На склад вернётся примерно 50% стройматериалов (округление вниз): ${preview}.</p>`,
+      yes:{label:mode==='erase'?'Удалить навсегда':'Разобрать и вернуть материалы'},no:{label:'Отмена'}});
+    }catch{return;}
+    if(!confirmed)return;
+    return await requestIndustry({action:'dismantle',colonyId:colony.id,placementId:placement.id,mode});
+  }
   if(action==='cancel'){
     let confirmed;
     try{confirmed=await Dialog.confirm({window:{title:'Отменить заказ?'},
-      content:'<p>Материалы будут возвращены на общий склад, если в нём достаточно места.</p>',
+      content:'<p>Материалы вернутся в исходное хранилище: общий или выбранный локальный склад (при наличии места).</p>',
       yes:{label:'Отменить и вернуть материалы'},no:{label:'Оставить заказ'}});
     }catch{return;}
     if(!confirmed)return;
@@ -223,7 +242,14 @@ async function askCrew(sheet,el){
   const colony=colonyFor(sheet.document);
   if(!colony)return ui.notifications.warn('Для экспедиции сначала создайте колонию.');
   const action=el.dataset.crewAction;
-  if(action==='finish'||action==='cancel'||action==='remove-empty'){
+  if(action==='finish'||action==='cancel'||action==='remove-empty'||action==='remove-node'){
+    if(action==='remove-node'){
+      let confirmed=false;
+      try{confirmed=await Dialog.confirm({window:{title:'Удалить месторождение?'},
+        content:'<p>Ведущий удалит точку ресурса с карты независимо от оставшегося запаса. Материалы не возвращаются и персонажи не изменяются. Точки с незавершённой добычей удалять нельзя.</p>',
+        yes:{label:'Удалить без последствий'},no:{label:'Отмена'}});}catch{return;}
+      if(!confirmed)return;
+    }
     if(action==='cancel'){
       const confirmed=await Dialog.confirm({window:{title:'Отменить работу?'},
         content:'Зарезервированные материалы вернутся туда, откуда были взяты.',
@@ -345,28 +371,31 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     form:{submitOnChange:false,closeOnSubmit:false},
     actions:{editImage:this.editImage}};
   static PARTS={body:{template:'systems/project-genesis/templates/actor.hbs'}};
-  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;}
+  constructor(options={}){super(options);this._genesisTab='overview';this._techFilter='all';this._techQuery='';this._techSelected='survey';this._techZoom=1;this._subtreeOpen=false;this._subtechSelected='survey-landing';}
   async _prepareContext(options){
     const ctx=await super._prepareContext(options),actor=this.document;
     const cap=capacity(actor),inventory=summarizeInventory(actor.items),load=inventory.load;
     const isColony=actor.type==='colony',isSurvivor=actor.type==='survivor';
+    const colony=colonyFor(actor),worldDay=game.settings.get('project-genesis','worldDay');
+    // A network snapshot is expensive: compute it once, share it across all sheet sections.
+    const networkSnapshot=colony?getNetworkSimulation(colony):null;
     return {...ctx,actor,isColony,isSurvivor,editable:actor.isOwner,isGM:game.user.isGM,
       abilities:Object.entries(ABILITIES).map(([key,label])=>({key,label,value:fieldValue(actor,`abilities.${key}`)})),
       skills:Object.entries(SKILLS).map(([key,label])=>({key,label,value:fieldValue(actor,`skills.${key}`)})),
       vitals:!isColony?Object.entries(actor.system.survival).map(([key,value])=>({key,value,label:({health:'Здоровье',hunger:'Голод',thirst:'Жажда',fatigue:'Усталость',oxygen:'Кислород'})[key]})):[],
       items:listContexts(actor,inventory),containers:containerContexts(actor,inventory),load,cap,
       totalItems:inventory.totalItems,
-      worldDay:game.settings.get('project-genesis','worldDay'),
+      worldDay,
       journal:recentOperations().slice(0,25),
-      colony:game.actors.find(a=>a.type==='colony'),
+      colony,
       tab:this._genesisTab,systemVersion:game.system.version,
-      planet:planetContext(colonyFor(actor),game.settings.get('project-genesis','worldDay')),
-      rest:{...restContext(actor,colonyFor(actor),game.settings.get('project-genesis','worldDay')),canAct:actor.isOwner},
-      mission:{...missionStage(colonyFor(actor),game.settings.get('project-genesis','worldDay')),
+      planet:planetContext(colony,worldDay),
+      rest:{...restContext(actor,colony,worldDay),canAct:actor.isOwner},
+      mission:{...missionStage(colony,worldDay),
         canAct:game.user.isGM || (game.actors.some(a=>a.type==='survivor'&&a.testUserPermission(game.user,'OWNER')))},
-      research:researchContext(colonyFor(actor),game.user),
-      industry:industryContext(actor,game.user),
-      networks:networkContext(actor,game.user),
+      research:researchContext(colony,game.user,networkSnapshot?.simulation),
+      industry:industryContext(actor,game.user,networkSnapshot?.simulation),
+      networks:networkContext(actor,game.user,networkSnapshot),
       crew:crewContext(actor,game.user)
     };
   }
@@ -390,6 +419,15 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
     const board=root.querySelector('[data-genesis-tech-board]');
     const applyView=()=>{
       if(!board)return;
+      const main=root.querySelector('[data-genesis-research-main]');
+      const subtree=root.querySelector('[data-genesis-research-subtree]');
+      if(main)main.hidden=this._subtreeOpen;
+      if(subtree)subtree.hidden=!this._subtreeOpen;
+      root.querySelectorAll('[data-genesis-subtech-card]').forEach(c=>{
+        c.classList.toggle('is-selected',c.dataset.genesisSubtechCard===this._subtechSelected);
+        c.setAttribute('aria-pressed',String(c.dataset.genesisSubtechCard===this._subtechSelected));
+      });
+      root.querySelectorAll('[data-genesis-subtech-detail]').forEach(d=>{d.hidden=d.dataset.genesisSubtechDetail!==this._subtechSelected;});
       board.style.zoom=String(this._techZoom);
       const query=this._techQuery.trim().toLocaleLowerCase();
       const visible=[];
@@ -405,7 +443,7 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       root.querySelectorAll('[data-genesis-tech-detail]').forEach(d=>{d.hidden=d.dataset.genesisTechDetail!==this._techSelected;});
       root.querySelectorAll('[data-genesis-tech-card]').forEach(c=>c.classList.toggle('is-selected',c.dataset.genesisTechCard===this._techSelected));
       root.querySelectorAll('[data-genesis-zoom-level]').forEach(e=>e.textContent=`${Math.round(this._techZoom*100)}%`);
-      drawTechnologyLinks(root);
+      if(!this._subtreeOpen)drawTechnologyLinks(root);
     };
     this._techResizeObserver?.disconnect();
     this._techResizeObserver=null;
@@ -458,7 +496,19 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
       const tab=event.target.closest?.('[data-genesis-tab]');
       if (tab) {selectTab(tab.dataset.genesisTab);if(tab.dataset.genesisTab==='research')applyView();return;}
       const techCard=event.target.closest?.('[data-genesis-tech-card]');
-      if(techCard){this._techSelected=techCard.dataset.genesisTechCard;applyView();return;}
+      if(techCard){
+        this._techSelected=techCard.dataset.genesisTechCard;
+        if(this._techSelected==='survey')this._subtreeOpen=true;
+        applyView();return;
+      }
+      if(event.target.closest?.('[data-genesis-open-subtree]')){
+        this._techSelected='survey';this._subtreeOpen=true;applyView();return;
+      }
+      if(event.target.closest?.('[data-genesis-back-to-tree]')){
+        this._subtreeOpen=false;applyView();return;
+      }
+      const subCard=event.target.closest?.('[data-genesis-subtech-card]');
+      if(subCard){this._subtechSelected=subCard.dataset.genesisSubtechCard;applyView();return;}
       const filter=event.target.closest?.('[data-genesis-tech-filter]');
       if(filter){this._techFilter=filter.dataset.genesisTechFilter;applyView();return;}
       const el=event.target.closest?.('[data-genesis-action]');
@@ -483,6 +533,14 @@ export class GenesisActorSheet extends HandlebarsApplicationMixin(ActorSheetV2){
           const definition=game.projectGenesis?.buildings?.find(b=>b.id===building);
           if(colony&&definition)startPlacement({colonyId:colony.id,buildingId:building,buildingName:definition.name,
             existing:el.dataset.industryAction==='place-existing'});
+        }
+        else if(action==='enter-room'){
+          const colony=colonyFor(this.document);
+          if(colony)await enterRoom(colony.id,el.dataset.placementId);
+        }
+        else if(action==='station-craft'){
+          const colony=colonyFor(this.document);
+          if(colony)await openStationCraft(colony.id,el.dataset.placementId);
         }
         else if(action==='repair-map'&&game.user.isGM){
           const colony=colonyFor(this.document);

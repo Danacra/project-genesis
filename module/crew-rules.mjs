@@ -42,7 +42,7 @@ export function journeyDays(scene,from,to,actor,cargo){
   return Math.max(1,Math.ceil(blocks/(18*cart))+Math.floor(cargoMass/(35*cart)));
 }
 export function cacheLimit(placement){
-  return placement.buildingId==='storehouse'?{mass:750,volume:1500}:
+  return (placement.buildingId==='storehouse'||placement.buildingId==='local-store')?{mass:750,volume:1500}:
     placement.status==='construction'?{mass:220,volume:330}:{mass:200,volume:300};
 }
 export function cacheLoad(stock){return list(stock).reduce((a,r)=>({mass:round(a.mass+r.quantity*r.unitMass),

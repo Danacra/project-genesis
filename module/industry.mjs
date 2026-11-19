@@ -5,7 +5,11 @@ import { withWorldLock } from './logistics.mjs';
 import { colonyFor } from './research.mjs';
 import { stockByCode } from './research-rules.mjs';
 import { assertPlacement, asTileData, tileAsset, placementHealth, assertHealthyPlacement } from './map-rules.mjs';
-import { stationOperational,getNetworkSimulation } from './networks.mjs';
+import { stationOperational,placementOperational,getNetworkSimulation } from './networks.mjs';
+import {isInteriorBuilding,isCraftStation,salvageFor,structureBlockers,assertCanPlaceInside,assertInteriorOwnership} from './structure-rules.mjs';
+import {capacity,summarizeInventory} from './rules.mjs';
+import {RESOURCE_NODES,crewState,stockFor,setStock} from './crew-rules.mjs';
+import {LOCAL_WAREHOUSE,warehouseNearStation,localStockCounts,planLocalTake,restoreLocalTake,localOutput} from './local-storage-rules.mjs';
 const SYSTEM='project-genesis', TIMEOUT=60000, MAX_JOBS=40;
 const outstanding=new Map(), handled=new Set();
 const array=value=>Array.isArray(value)?value:[];
@@ -30,11 +34,6 @@ function getUser(userId){
   return user;
 }
 function patchIndustry(patch){return Object.fromEntries(Object.entries(patch).map(([k,v])=>[`system.industry.${k}`,v]));}
-async function rollbackDeductions(colony,plan){
-  const changes=plan.changes.map(c=>({ _id:c._id,'system.quantity':
-    Number(colony.items.get(c._id)?.system.quantity||0)+plan.escrow.filter(e=>e.itemId===c._id).reduce((n,e)=>n+e.count,0) }));
-  await colony.updateEmbeddedDocuments('Item',changes);
-}
 async function debitAndCommit(colony,plan,statePatch){
   // An embedded document batch may fail after the server accepted some changes.
   // Keep the actual original quantities, never assume a complete debit occurred.
@@ -71,13 +70,13 @@ async function depositAndCommit(colony,data,update){
     throw error;
   }
 }
-async function refundAndCommit(colony,reserved,statePatch){
+async function refundAndCommit(colony,reserved,statePatch,extraUpdates={}){
   const refund=refundPlan(colony,reserved);
   let created=[],didUpdate=false;
   try{
     if(refund.changes.length){await colony.updateEmbeddedDocuments('Item',refund.changes.map(c=>({_id:c.id,'system.quantity':c.after})));didUpdate=true;}
     if(refund.creates.length){created=await colony.createEmbeddedDocuments('Item',refund.creates);}
-    await colony.update(patchIndustry(statePatch));
+    await colony.update({...patchIndustry(statePatch),...extraUpdates});
   }catch(error){
     try{
       if(created.length)await colony.deleteEmbeddedDocuments('Item',created.map(i=>i.id));
@@ -86,8 +85,9 @@ async function refundAndCommit(colony,reserved,statePatch){
     throw error;
   }
 }
-function jobRow(name,subject,batches,days,createdBy,userId,escrow){return {
-  id:uid(),subject,name,amount:batches,remaining:days,startedDay:day(),createdBy,userId,reserved:escrow
+function jobRow(name,subject,batches,days,createdBy,userId,escrow,sourcePlacementId='',stationPlacementId=''){return {
+  id:uid(),subject,name,amount:batches,remaining:days,startedDay:day(),createdBy,userId,reserved:escrow,
+  sourcePlacementId,outputPlacementId:sourcePlacementId,stationPlacementId
 };}
 async function commit(request){
   if(!/^[\w-]{12,80}$/.test(request.id||''))throw Error('Некорректный идентификатор операции.');
@@ -97,18 +97,47 @@ async function commit(request){
   const {action}=request;
   let result='';
   if(action==='start-recipe'){
-    const status=recipeState(request.subject,colony,Number(request.amount));
+    const localId=String(request.sourcePlacementId||'');
+    let warehouse=null,localStock=[];
+    if(localId){
+      const station=array(industry.placements).find(p=>p.id===request.stationPlacementId);
+      warehouse=array(industry.placements).find(p=>p.id===localId);
+      if(!warehouseNearStation(station,warehouse,game.scenes))
+        throw Error('Локальный склад должен быть готов и находиться на наружной карте этого станка.');
+      const wscene=game.scenes.get(warehouse.sceneId);
+      assertHealthyPlacement(warehouse,wscene,wscene?.tiles?.get?.(warehouse.tileId));
+      localStock=stockFor(crewState(colony),localId);
+    }
+    const status=recipeState(request.subject,colony,Number(request.amount),localId?localStockCounts(localStock):null);
     if(!status.unlocked)throw Error('Сначала исследуйте необходимую технологию.');
     if(!status.stationReady)throw Error('Не построена необходимая мастерская / лаборатория.');
-    if(rulesNeedPower(status.recipe.station,colony))throw Error('Станция обесточена или не имеет необходимой сети. Проверьте вкладку «Энергия и сети».');
+    if(request.stationPlacementId){
+      const placement=array(industry.placements).find(p=>p.id===request.stationPlacementId);
+      if(!placement||placement.status!=='finished'||placement.buildingId!==status.recipe.station)
+        throw Error('Этот станок не производит выбранный рецепт.');
+      const scene=game.scenes.get(placement.sceneId);
+      assertHealthyPlacement(placement,scene,scene?.tiles?.get?.(placement.tileId));
+      if(!placementOperational(colony,placement))throw Error('Станок не работает: проверьте внешнее питание помещения и подключение инженерных сетей.');
+    }else if(rulesNeedPower(status.recipe.station,colony))throw Error('Станция обесточена или не имеет необходимой сети. Проверьте вкладку «Энергия и сети».');
     if(!status.canStart)throw Error('На складе недостаточно материалов.');
     if(array(industry.jobs).length>=MAX_JOBS)throw Error('Очередь производства заполнена.');
-    const r=status.recipe,plan=planTake(colony.items,r.inputs,Number(request.amount));
-    const row=jobRow(r.name,r.id,Number(request.amount),r.days*Number(request.amount),user.name,user.id,plan.escrow);
-    await debitAndCommit(colony,plan,{
-      jobs:[...array(industry.jobs),row],history:history(industry,'start',`${r.name} ×${row.amount}`,user.name),processed:processed(industry,request.id)
-    });
-    result=`Добавлено в очередь: ${r.name} · ${row.remaining} сут.`;
+    const r=status.recipe;
+    if(localId){
+      // Single Actor update writes both source cache and the production order.
+      // If it rejects, neither part is committed; retry cannot debit twice.
+      const plan=planLocalTake(localStock,r.inputs,Number(request.amount));
+      const row=jobRow(r.name,r.id,Number(request.amount),r.days*Number(request.amount),user.name,user.id,plan.reserved,localId,String(request.stationPlacementId||''));
+      await colony.update({...patchIndustry({
+        jobs:[...array(industry.jobs),row],history:history(industry,'start',`${r.name} ×${row.amount} · локальный склад`,user.name),processed:processed(industry,request.id)
+      }),'system.crew.caches':setStock(crewState(colony),localId,plan.stock)});
+    }else{
+      const plan=planTake(colony.items,r.inputs,Number(request.amount));
+      const row=jobRow(r.name,r.id,Number(request.amount),r.days*Number(request.amount),user.name,user.id,plan.escrow,'',String(request.stationPlacementId||''));
+      await debitAndCommit(colony,plan,{
+        jobs:[...array(industry.jobs),row],history:history(industry,'start',`${r.name} ×${row.amount}`,user.name),processed:processed(industry,request.id)
+      });
+    }
+    result=`Добавлено в очередь: ${r.name} · ${r.days*Number(request.amount)} сут.`;
   }else if(action==='start-building'){
     const status=buildingState(request.subject,colony);
     if(!status.unlocked)throw Error('Для здания не изучена технология.');
@@ -129,6 +158,8 @@ async function commit(request){
       if(!scene)throw Error('Сцена не найдена.');
       if(!scene.testUserPermission?.(game.user,'OWNER')&&!game.user.isGM)
         throw Error('Ведущий не может изменить эту сцену.');
+      assertCanPlaceInside(b.id,scene);
+      assertInteriorOwnership(colony,scene);
       const rect=assertPlacement(b.id,{x:request.x,y:request.y},scene,{placements:array(industry.placements)});
       const placementId=uid();
       const placement={id:placementId,colonyId:colony.id,buildingId:b.id,sceneId:scene.id,
@@ -162,6 +193,8 @@ async function commit(request){
     const alreadyMapped=array(industry.placements).filter(p=>p.buildingId===b.id&&p.status==='finished').length;
     if(alreadyMapped>=built)throw Error('Все готовые здания этого типа уже отмечены на карте.');
     const scene=game.scenes.get(request.sceneId);if(!scene)throw Error('Сцена не найдена.');
+    assertCanPlaceInside(b.id,scene);
+    assertInteriorOwnership(colony,scene);
     const rect=assertPlacement(b.id,{x:request.x,y:request.y},scene,{placements:array(industry.placements)});
     const placementId=uid(),legacyId=uid();
     const placement={id:placementId,colonyId:colony.id,buildingId:b.id,sceneId:scene.id,
@@ -185,6 +218,69 @@ async function commit(request){
       throw error;
     }
     result=`Готовое здание отмечено на карте: ${b.name}.`;
+  }else if(action==='dismantle'){
+    if(!user.isGM)throw Error('Разбирать готовые здания может только ведущий.');
+    if(!['salvage','erase'].includes(request.mode))throw Error('Выберите обычную разборку или административное удаление.');
+    const p=array(industry.placements).find(x=>x.id===request.placementId);
+    if(!p)throw Error('Постройка не найдена.');
+    const b=BUILDING_BY_ID[p.buildingId];if(!b)throw Error('Неизвестный тип постройки.');
+    const reasons=structureBlockers(p,{links:colony.system.infrastructure?.links,
+      caches:colony.system.crew?.caches,jobs:colony.system.crew?.jobs,
+      placements:industry.placements,productionJobs:industry.jobs,buildingCount:buildingCount(industry,p.buildingId),
+      missionStage:colony.system.mission?.stage});
+    if(reasons.length)throw Error(reasons.join(' '));
+    const scene=game.scenes.get(p.sceneId),tile=scene?.tiles?.get?.(p.tileId);
+    assertHealthyPlacement(p,scene,tile);
+    const built=buildingCount(industry,b.id);
+    if(built<1)throw Error('Счётчик построек повреждён. Нужна проверка ведущего.');
+    const interior=p.interiorSceneId?game.scenes.get(p.interiorSceneId):null;
+    if(interior){
+      const used=['tiles','tokens','walls','drawings','lights','sounds','notes','templates','regions'].some(k=>[...(interior[k]||[])].length>0);
+      if(used)throw Error('Внутренняя сцена содержит игровые объекты. Сначала сохраните или очистите её: автоматическое удаление небезопасно.');
+    }
+    const materials=request.mode==='salvage'?salvageFor(b.id):{};
+    const reserve=Object.entries(materials).map(([code,count])=>{
+      const spec=RESOURCE_NODES[code]||RECIPES.find(r=>r.output.code===code)?.output||{};
+      return {itemId:'',count,code,name:resourceName(code),type:'material',
+        img:RESOURCE_NODES[code]?`systems/${SYSTEM}/assets/resources/${code}.svg`:'icons/svg/item-bag.svg',
+        unitMass:Number(spec.mass??spec.unitMass??1),unitVolume:Number(spec.volume??spec.unitVolume??1),
+        quality:0,techTier:0,description:'Возврат при разборке',containerId:''};
+    });
+    const newBuildings=array(industry.buildings).filter(x=>x.id!==b.id);
+    if(built>1)newBuildings.push({...array(industry.buildings).find(x=>x.id===b.id),count:built-1});
+    if(b.id==='storehouse'){
+      const cap=capacity(colony),load=summarizeInventory(colony.items).exactLoad;
+      const refundMass=reserve.reduce((n,r)=>n+r.count*r.unitMass,0);
+      const refundVolume=reserve.reduce((n,r)=>n+r.count*r.unitVolume,0);
+      if(load.mass+refundMass>cap.mass-750||load.volume+refundVolume>cap.volume-1500)
+        throw Error('После удаления склада ресурсов станет больше допустимой вместимости. Сначала разгрузите склад.');
+    }
+    const facilities=b.facility&&built===1?
+      array(colony.system.science?.facilities).filter(id=>id!==b.facility):array(colony.system.science?.facilities);
+    const tileBackup=tile.toObject();
+    await scene.deleteEmbeddedDocuments('Tile',[tile.id]);
+    try{
+      await refundAndCommit(colony,reserve,{
+        buildings:newBuildings,placements:array(industry.placements).filter(x=>x.id!==p.id),
+        history:history(industry,'dismantle',`${b.name} · ${request.mode==='salvage'?'разборка':'удаление GM'}`,user.name),
+        processed:processed(industry,request.id)
+      },{
+        ...(b.facility&&built===1?{'system.science.facilities':facilities}:{}),
+        'system.crew.caches':array(colony.system.crew?.caches).filter(x=>x.placementId!==p.id),
+        'system.infrastructure.priorities':array(colony.system.infrastructure?.priorities).filter(x=>x.id!==p.id)
+      });
+    }catch(error){
+      try{
+        const restored=await scene.createEmbeddedDocuments('Tile',[tileBackup],{keepId:true});
+        if(restored[0]?.id!==tile.id)throw Error('ID тайла изменился.');
+      }catch(recovery){console.error('GENESIS: dismantling rollback failed',recovery);
+        throw Error('Сохранение разборки прервано; не удалось восстановить тайл. Проверьте карту и склад вручную.');}
+      throw error;
+    }
+    if(interior){try{await interior.delete();}catch(error){
+      console.warn('GENESIS: empty interior scene could not be deleted',error);
+      ui.notifications.warn('Здание разобрано, но пустую внутреннюю сцену пришлось оставить. Удалите её вручную после проверки.');}}
+    result=`${b.name}: ${request.mode==='salvage'?'разобрано, пригодные материалы возвращены на общий склад':'удалено без возврата ресурсов'}.`;
   }else if(action==='repair-map'){
     if(!user.isGM)throw Error('Восстанавливать тайлы может только ведущий.');
     const placement=array(industry.placements).find(p=>p.id===request.placementId);
@@ -223,12 +319,24 @@ async function commit(request){
     if(job.remaining>0)throw Error('Производство ещё не завершено.');
     const recipe=RECIPE_BY_ID[job.subject];if(!recipe)throw Error('Неизвестный рецепт в очереди.');
     const item=outputItem(recipe,job.amount);
-    await depositAndCommit(colony,item,patchIndustry({
+    const update=patchIndustry({
       jobs:array(industry.jobs).filter(x=>x.id!==job.id),
       history:history(industry,'collect',`${recipe.name} ×${item.system.quantity}`,user.name),
       processed:processed(industry,request.id)
-    }));
-    result=`Получено со станка: ${recipe.name} ×${item.system.quantity}.`;
+    });
+    if(job.outputPlacementId){
+      const w=array(industry.placements).find(p=>p.id===job.outputPlacementId);
+      if(!w||w.buildingId!==LOCAL_WAREHOUSE||w.status!=='finished')
+        throw Error('Локальный склад производства больше недоступен.');
+      const scene=game.scenes.get(w.sceneId);
+      assertHealthyPlacement(w,scene,scene?.tiles?.get?.(w.tileId));
+      const s=crewState(colony),stock=localOutput(stockFor(s,w.id),item,w);
+      await colony.update({...update,'system.crew.caches':setStock(s,w.id,stock)});
+      result=`Получено: ${recipe.name} ×${item.system.quantity} → локальный склад.`;
+    }else{
+      await depositAndCommit(colony,item,update);
+      result=`Получено со станка: ${recipe.name} ×${item.system.quantity}.`;
+    }
   }else if(action==='complete-building'){
     const job=array(industry.construction).find(x=>x.id===request.jobId);
     if(!job)throw Error('Стройка уже отсутствует.');
@@ -274,11 +382,21 @@ async function commit(request){
     if(placement)assertHealthyPlacement(placement,scene,tile);
     const tileBackup=tile?.toObject?.();
     if(tile)await scene.deleteEmbeddedDocuments('Tile',[tile.id]);
-    try{await refundAndCommit(colony,job.reserved,{
-      [field]:array(industry[field]).filter(x=>x.id!==job.id),
-      ...(placement?{placements:array(industry.placements).filter(p=>p.id!==placement.id)}:{}),
-      history:history(industry,'cancel',job.name,user.name),processed:processed(industry,request.id)
-    });}
+    try{
+      const updated={
+        [field]:array(industry[field]).filter(x=>x.id!==job.id),
+        ...(placement?{placements:array(industry.placements).filter(p=>p.id!==placement.id)}:{}),
+        history:history(industry,'cancel',job.name,user.name),processed:processed(industry,request.id)
+      };
+      if(job.sourcePlacementId){
+        const w=array(industry.placements).find(p=>p.id===job.sourcePlacementId);
+        if(!w||w.buildingId!==LOCAL_WAREHOUSE||w.status!=='finished')throw Error('Локальный склад для возврата недоступен.');
+        const wscene=game.scenes.get(w.sceneId);
+        assertHealthyPlacement(w,wscene,wscene?.tiles?.get?.(w.tileId));
+        const stock=restoreLocalTake(stockFor(crewState(colony),w.id),job.reserved,w);
+        await colony.update({...patchIndustry(updated),'system.crew.caches':setStock(crewState(colony),w.id,stock)});
+      }else await refundAndCommit(colony,job.reserved,updated);
+    }
     catch(error){
       if(tileBackup){
         try{await scene.createEmbeddedDocuments('Tile',[tileBackup],{keepId:true});}
@@ -306,32 +424,48 @@ async function commit(request){
   if(handled.size>3000)handled.clear();
   return result;
 }
-export function industryContext(actor,user){
+export function industryContext(actor,user,precomputedSimulation=null){
   const colony=colonyFor(actor);
   if(!colony)return {available:false};
   const industry=industryOf(colony),stock=stockByCode(colony.items),
     canAct=user.isGM||game.actors.some(a=>a.type==='survivor'&&a.testUserPermission(user,'OWNER'));
-  const networkSimulation=getNetworkSimulation(colony).simulation;
+  const networkSimulation=precomputedSimulation||getNetworkSimulation(colony).simulation;
+  const stationOnlineCache=new Map();
+  const isStationOnline=station=>{
+    if(!stationOnlineCache.has(station))stationOnlineCache.set(station,stationOperational(colony,station,networkSimulation));
+    return stationOnlineCache.get(station);
+  };
   const craft=RECIPES.map(r=>{
     const status=recipeState(r.id,colony,1,stock);
-    const stationOnline=stationOperational(colony,r.station,networkSimulation);
+    const stationOnline=isStationOnline(r.station);
     return {...r,...status,stationReady:status.stationReady&&stationOnline,stationName:r.station?BUILDING_BY_ID[r.station]?.name||r.station:'Ручная работа',
       outputName:r.name,outputQuantity:r.output.quantity,canQueue:canAct&&status.canStart&&stationOnline};
   });
+  const indoor=Boolean(globalThis.canvas?.scene?.flags?.[SYSTEM]?.interiorOf);
+  const builtById=new Map(array(industry.buildings).map(b=>[b.id,b]));
+  const mappedById=new Map();
+  const constructionByJob=new Map();
+  for(const p of array(industry.placements)){
+    if(p.status==='finished')mappedById.set(p.buildingId,(mappedById.get(p.buildingId)||0)+1);
+    if(p.jobId)constructionByJob.set(p.jobId,p);
+  }
   const buildings=BUILDINGS.map(b=>{
     const status=buildingState(b.id,colony,stock);
-    const house=array(industry.buildings).find(x=>x.id===b.id);
-    const mappedFinished=array(industry.placements).filter(p=>p.buildingId===b.id&&p.status==='finished').length;
-    return {...b,...status,canQueue:canAct&&status.canStart,
+    const house=builtById.get(b.id);
+    const mappedFinished=mappedById.get(b.id)||0;
+    const allowedHere=!indoor||['bench','fieldLab','furnace','bioLab','electronicsLab'].includes(b.id);
+    return {...b,...status,canQueue:allowedHere&&canAct&&status.canStart,
+      indoorRestricted:!allowedHere,
       legacyUnmapped:Math.max(0,status.built-mappedFinished),
       canPlaceLegacy:user.isGM&&status.built>mappedFinished,
       techName:status.unlocked?'Изучено':'Нужна технология',
       harvested:!!b.harvest&&!!house?.count&&house.lastClaimDay>=day(),
-      canHarvest:canAct&&!!b.harvest&&!!house?.count&&house.lastClaimDay<day()&&stationOperational(colony,b.id,networkSimulation)};
+      canHarvest:canAct&&!!b.harvest&&!!house?.count&&house.lastClaimDay<day()&&isStationOnline(b.id)};
   });
-  const jobs=array(industry.jobs).map(job=>({...job,ready:job.remaining<=0,canCancel:canAct&&(user.isGM||job.userId===user.id)}));
+  const jobs=array(industry.jobs).map(job=>({...job,ready:job.remaining<=0,canCancel:canAct&&(user.isGM||job.userId===user.id),
+    storageName:job.sourcePlacementId?'Локальный склад':'Общий склад'}));
   const construction=array(industry.construction).map(job=>{
-    const placement=array(industry.placements).find(p=>p.jobId===job.id);
+    const placement=constructionByJob.get(job.id);
     return {...job,ready:job.remaining<=0,canCancel:canAct&&(user.isGM||job.userId===user.id),
       mapped:!!placement,sceneName:placement?game.scenes.get(placement.sceneId)?.name||'Неизвестная сцена':'Без карты',
       mapSceneId:placement?.sceneId||'',mapX:placement?.x||0,mapY:placement?.y||0};
@@ -345,6 +479,8 @@ export function industryContext(actor,user){
       const health=placementHealth(p,scene,tile);
       return {...p,name:BUILDING_BY_ID[p.buildingId]?.name||p.buildingId,
         sceneName:scene?.name||'Удалённая сцена',isFinished:p.status==='finished',
+        canDismantle:user.isGM&&p.status==='finished'&&health==='ok',
+        isRoom:isInteriorBuilding(p.buildingId),isStation:isCraftStation(p.buildingId),
         mapOk:health==='ok',canRepair:user.isGM&&health==='missing-tile',
         mapProblem:({
           'missing-scene':'Сцена удалена','missing-tile':'Тайл отсутствует',

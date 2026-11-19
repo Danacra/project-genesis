@@ -5,8 +5,8 @@ import {BUILDING_FOOTPRINTS,sceneGeometry,snapToGrid,footprintRect,checkPlacemen
 const makeScene=({width=1200,height=900,grid=100,type=1,x=0,y=0,tiles=[]}={})=>({
   id:'scene01',width,height,grid:{type,size:grid},dimensions:{sceneRect:{x,y,width,height}},tiles
 });
-test('each of 12 buildings has a footprint and a shipped SVG path',()=>{
-  assert.equal(Object.keys(BUILDING_FOOTPRINTS).length,12);
+test('each of 14 buildings has a footprint and a shipped SVG path',()=>{
+  assert.equal(Object.keys(BUILDING_FOOTPRINTS).length,14);
   for(const [code,dimensions] of Object.entries(BUILDING_FOOTPRINTS)){
     assert.equal(dimensions.length,2);
     assert.ok(dimensions.every(n=>Number.isSafeInteger(n)&&n>0));

@@ -1,16 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TECHNOLOGIES, TECHNOLOGY_BY_ID } from '../module/tech-data.mjs';
+import { TECHNOLOGIES, TECHNOLOGY_BY_ID, FIELD_STUDIES } from '../module/tech-data.mjs';
 import { validateCatalog, techStatus, planInvestment, planMaterialUse, completionPatch, unlockedRecipes, stockByCode } from '../module/research-rules.mjs';
 function state(extra={}) {return {points:50,tier:0,unlocked:[],facilities:[],projects:[],dailyWork:[],discoveries:[],...extra};}
 function item(id,code,quantity,type='material') {return {id,name:code,type,system:{resourceCode:code,quantity}};}
 test('technology catalog is valid and contains multiple parallel branches',()=>{
- const catalog=validateCatalog();assert.equal(catalog.technologies,25);assert.equal(catalog.recipes,27);
+ const catalog=validateCatalog();assert.equal(catalog.technologies,25);assert.equal(catalog.subresearch,10);assert.equal(catalog.recipes,27);
  assert.ok(new Set(TECHNOLOGIES.map(t=>t.branch)).size>=6);
 });
 test('initial technology is accessible and no cost materials',()=>{
- const t=techStatus('survey',state(),[]);
+ const t=techStatus('survey-landing',state(),[]);
  assert.equal(t.prerequisitesReady,true);assert.equal(t.ready,true);assert.equal(t.progress,0);
+ const group=techStatus('survey',state(),[]);
+ assert.equal(group.prerequisitesReady,false);assert.equal(group.required,10);
 });
 test('prerequisite blocks downstream research',()=>{
  const t=techStatus('shelter',state(),[item('w','wood',20)]);
@@ -25,20 +27,20 @@ test('resource stock sums matching stacks and excludes containers',()=>{
  assert.equal(stock.stone,5);
 });
 test('funding progress cannot exceed cost and uses colony points',()=>{
- const p=planInvestment(state(), 'survey',3);
- assert.equal(p.points,47);assert.deepEqual(p.projects,[{id:'survey',invested:3}]);
- const p2=planInvestment(state({...p,unlocked:[]}), 'survey',1);
- assert.equal(p2.projects[0].invested,4);
+ const p=planInvestment(state(), 'survey-landing',1);
+ assert.equal(p.points,49);assert.deepEqual(p.projects,[{id:'survey-landing',invested:1}]);
+ const p2=planInvestment(state({...p,unlocked:[]}), 'survey-landing',1);
+ assert.equal(p2.projects[0].invested,2);
 });
 test('funding forbidden on locked and completed technologies',()=>{
  assert.throws(()=>planInvestment(state(),'shelter',2),/предыдущие/);
- assert.throws(()=>planInvestment(state({unlocked:['survey']}),'survey',1),/уже изучена/);
+ assert.throws(()=>planInvestment(state({unlocked:['survey-landing']}),'survey-landing',1),/уже изучена/);
 });
 test('funding rejects decimals, zero, excessive and over-budget points',()=>{
- assert.throws(()=>planInvestment(state(),'survey',1.5),/целое/);
- assert.throws(()=>planInvestment(state(),'survey',0),/целое/);
- assert.throws(()=>planInvestment(state({points:1}),'survey',2),/Недостаточно/);
- assert.throws(()=>planInvestment(state(),'survey',5),/не более/);
+ assert.throws(()=>planInvestment(state(),'survey-landing',1.5),/целое/);
+ assert.throws(()=>planInvestment(state(),'survey-landing',0),/целое/);
+ assert.throws(()=>planInvestment(state({points:1}),'survey-landing',2),/Недостаточно/);
+ assert.throws(()=>planInvestment(state(),'survey-landing',3),/не более/);
 });
 test('a fully funded project with missing materials is not completed',()=>{
  const science=state({unlocked:['survey'],projects:[{id:'shelter',invested:5}]});
@@ -53,14 +55,14 @@ test('material usage throws before deducting if missing',()=>{
  assert.throws(()=>planMaterialUse('shelter',[item('x','wood',99)]),/Волокно/);
 });
 test('completing research creates discovery and removes spent project',()=>{
- const science=state({projects:[{id:'survey',invested:4}]});
- const patch=completionPatch(science,'survey','GM',12);
- assert.deepEqual(patch.unlocked,['survey']);assert.deepEqual(patch.projects,[]);
- assert.deepEqual(patch.discoveries[0],{techId:'survey',day:12,by:'GM'});
+ const science=state({projects:[{id:'survey-landing',invested:2}]});
+ const patch=completionPatch(science,'survey-landing','GM',12);
+ assert.deepEqual(patch.unlocked,['survey-landing']);assert.deepEqual(patch.projects,[]);
+ assert.deepEqual(patch.discoveries[0],{techId:'survey-landing',day:12,by:'GM'});
 });
 test('completion preserves an established higher tier and parallel projects',()=>{
- const science=state({tier:4,projects:[{id:'survey',invested:4},{id:'stone-tools',invested:3}]});
- const patch=completionPatch(science,'survey','GM',4);
+ const science=state({tier:4,projects:[{id:'survey-landing',invested:2},{id:'stone-tools',invested:3}]});
+ const patch=completionPatch(science,'survey-landing','GM',4);
  assert.equal(patch.tier,4);assert.deepEqual(patch.projects,[{id:'stone-tools',invested:3}]);
 });
 test('recipes switch from locked to unlocked based only on discoveries',()=>{

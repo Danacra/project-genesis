@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<defs><pattern id="floor" width="48" height="48" patternUnits="userSpaceOnUse"><rect width="48" height="48" fill="#62716d"/><path d="M0 0H48V48" stroke="#334746" stroke-width="3" fill="none"/></pattern><linearGradient id="wall" x2="0.5" y2="1"><stop stop-color="#b2c0ac"/><stop offset="1" stop-color="#566961"/></linearGradient></defs>
+<rect width="600" height="600" fill="#182c2c"/><rect x="18" y="18" width="564" height="564" rx="12" fill="url(#floor)"/>
+<path d="M18 560V18H582V560M18 560H228M370 560H582" stroke="url(#wall)" stroke-width="28" fill="none"/>
+<rect x="228" y="540" width="142" height="52" fill="#bd9459" stroke="#3a2b21" stroke-width="9"/>
+<g fill="#3b5246" stroke="#c8bb87" stroke-width="4"><rect x="65" y="62" width="120" height="88" rx="8"/><rect x="416" y="62" width="120" height="88" rx="8"/></g>
+<circle cx="300" cy="280" r="75" fill="none" stroke="#b4d1a3" stroke-width="6" stroke-dasharray="20 10"/>
+<text x="300" y="287" fill="#e7edcb" font-size="24" text-anchor="middle" font-family="Arial" font-weight="bold">МАСТЕРСКАЯ</text>
+</svg>

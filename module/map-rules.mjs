@@ -2,11 +2,12 @@
  * Coordinates and sizes are in Scene pixels; footprints are square grid cells.
  * This version deliberately supports square-grid scenes only.
  */
+import {interiorPlacementProblem} from './interior-rules.mjs';
 export const BUILDING_FOOTPRINTS = Object.freeze({
   bench:[2,2], fieldLab:[3,3], furnace:[3,3], bioLab:[3,3],
   powerLab:[3,3], electronicsLab:[3,3], flightLab:[5,4],
-  storehouse:[3,3], garden:[4,3], 'water-recycler':[3,3],
-  shelter:[3,2], 'assembly-dock':[6,5]
+  storehouse:[3,3], 'local-store':[3,3], garden:[4,3], 'water-recycler':[3,3],
+  shelter:[3,2], room:[6,6], 'assembly-dock':[6,5]
 });
 const SYSTEM='project-genesis';
 export const BASE_TILE = `systems/${SYSTEM}/assets/buildings/`;
@@ -50,8 +51,9 @@ export function checkPlacement(buildingId,position,scene,{placements=[],ignoreTi
   const inside=rect.x>=b.x && rect.y>=b.y && rect.x+rect.width<=b.x+b.width && rect.y+rect.height<=b.y+b.height;
   const blocked=tilesBlocking(scene).some(t=>t.id!==ignoreTileId&&overlaps(rect,t)) ||
     placements.some(p=>p.sceneId===scene.id && p.tileId!==ignoreTileId && overlaps(rect,p));
-  return {...rect,inside,blocked,valid:inside&&!blocked,reason:!inside?'Здание выходит за пределы карты.':
-    blocked?'Это место занято другой постройкой.':''};
+  const interiorProblem=inside?interiorPlacementProblem(scene,rect):'';
+  return {...rect,inside,blocked,valid:inside&&!blocked&&!interiorProblem,reason:!inside?'Здание выходит за пределы карты.':
+    interiorProblem|| (blocked?'Это место занято другой постройкой.':'')};
 }
 export function assertPlacement(buildingId,position,scene,options={}){
   if(!Number.isInteger(position.x)||!Number.isInteger(position.y))throw Error('Координаты должны быть целыми пикселями.');

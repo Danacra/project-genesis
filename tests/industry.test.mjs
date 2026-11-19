@@ -6,10 +6,10 @@ import { capacity } from '../module/rules.mjs';
 const stockItem=(id,code,quantity,extra={})=>({id,name:extra.name||code,type:'material',img:'icons/svg/item-bag.svg',system:{resourceCode:code,quantity,unitMass:extra.unitMass??1,unitVolume:extra.unitVolume??1,containerId:extra.containerId||'',...extra}});
 const inventory=(items=[])=>Object.assign([...items],{get(id){return this.find(i=>i.id===id)}});
 const colony=(items=[],unlocked=['survey'],facilities=[],industry={jobs:[],construction:[],buildings:[]},cap={mass:2500,volume:10000})=>({type:'colony',system:{science:{unlocked,facilities},industry,capacity:cap},items:inventory(items)});
-test('full catalog: 27 real recipes and 12 infrastructure types',()=>{
-  assert.deepEqual(validateIndustryCatalog(),{recipes:27,buildings:12});
-  assert.deepEqual(validateIndustryState(),{recipes:27,buildings:12});
-  assert.equal(RECIPES.length,27);assert.equal(BUILDINGS.length,12);
+test('full catalog: 27 real recipes and 14 infrastructure types',()=>{
+  assert.deepEqual(validateIndustryCatalog(),{recipes:27,buildings:14});
+  assert.deepEqual(validateIndustryState(),{recipes:27,buildings:14});
+  assert.equal(RECIPES.length,27);assert.equal(BUILDINGS.length,14);
   for(const r of RECIPES) assert.ok(r.techId&&r.output.quantity>0&&r.output.unitMass>=0);
 });
 test('theory and materials are distinct recipe gates',()=>{

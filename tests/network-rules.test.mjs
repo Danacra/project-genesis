@@ -4,8 +4,8 @@ import {NETWORK_TYPES,DEVICES,routeNetwork,networkCost,validateNetworkLink,asNet
 const p=(id,buildingId,x,y,width,height,sceneId='s')=>({id,buildingId,colonyId:'c',sceneId,jobId:id,status:'finished',x,y,width,height});
 const scene=(width=1200,height=800,tiles=[])=>({id:'s',grid:{type:1,size:100},dimensions:{sceneRect:{x:0,y:0,width,height}},tiles});
 const link=(id,type,fromId,toId)=>({id,type,fromId,toId,sceneId:'s'});
-test('12 building definitions have nonnegative loads and a production source for both networks',()=>{
-  assert.equal(Object.keys(DEVICES).length,12);
+test('14 building definitions have nonnegative loads and a production source for both networks',()=>{
+  assert.equal(Object.keys(DEVICES).length,14);
   assert.ok(DEVICES.powerLab.powerOut>0&&DEVICES['water-recycler'].waterOut>0);
   assert.equal(Object.keys(NETWORK_TYPES).length,2);
 });

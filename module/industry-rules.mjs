@@ -78,14 +78,21 @@ export function depositPlan(colony,incoming){
 export function refundPlan(colony,escrow){
   const changes=new Map(),creates=[];
   const pending=new Map();
+  const originalItems=new Map([...colony.items].map(item=>[item.id,item]));
+  const refillByContainer=new Map();
   let mass=0,volume=0;
   for(const row of list(escrow)){
     const n=Number(row.count);if(!Number.isSafeInteger(n)||n<1)throw Error('Повреждённый возврат материалов.');
     mass+=n*Number(row.unitMass);volume+=n*Number(row.unitVolume);
-    const current=colony.items.get?.(row.itemId)||Array.from(colony.items).find(i=>i.id===row.itemId);
+    const current=originalItems.get(row.itemId);
     const next=current?(changes.get(current.id)?.after??qty(current))+n:0;
     if(current&&next<=MAX_STACK){
       changes.set(current.id,{id:current.id,before:qty(current),after:next});
+      if(current.system.containerId){
+        const id=current.system.containerId,used=refillByContainer.get(id)||{mass:0,volume:0};
+        used.mass+=n*Number(row.unitMass);used.volume+=n*Number(row.unitVolume);
+        refillByContainer.set(id,used);
+      }
     }else{
       const key=JSON.stringify([row.type,row.code,row.name,row.unitMass,row.unitVolume,row.quality,row.techTier,row.description,row.img]);
       const found=pending.get(key);
@@ -98,24 +105,18 @@ export function refundPlan(colony,escrow){
       }
     }
   }
-  const currentLoad=summarizeInventory(colony.items).exactLoad;
+  const summary=summarizeInventory(colony.items);
+  const currentLoad=summary.exactLoad;
   if(!fits({mass:round(currentLoad.mass+mass),volume:round(currentLoad.volume+volume)},capacity(colony)))
     throw Error('Недостаточно свободного места, чтобы вернуть материалы.');
-  // Refunds to original stacks remain in their containers. Validate their capacity too.
-  const summary=summarizeInventory(colony.items);
-  for(const row of list(escrow)){
-    const current=colony.items.get?.(row.itemId)||Array.from(colony.items).find(i=>i.id===row.itemId);
-    if(!current||!changes.has(current.id)||!current.system.containerId)continue;
-    const container=summary.containers.get(current.system.containerId);
+  // Each container is checked once, using the full sum of refunds destined for it.
+  for(const [containerId,refill] of refillByContainer){
+    const container=summary.containers.get(containerId);
     if(!container)throw Error('Контейнер исходных материалов больше не существует.');
-    const usage=summary.byContainer.get(current.system.containerId)||{mass:0,volume:0};
-    // Cumulative refills to the same container (including items from other jobs).
-    const refill=list(escrow).filter(e=>{
-      const it=colony.items.get?.(e.itemId)||Array.from(colony.items).find(i=>i.id===e.itemId);
-      return it?.system.containerId===current.system.containerId && changes.has(e.itemId);
-    }).reduce((sum,e)=>({mass:sum.mass+e.count*e.unitMass,volume:sum.volume+e.count*e.unitVolume}),{mass:0,volume:0});
+    const usage=summary.byContainer.get(containerId)||{mass:0,volume:0};
     if(!fits({mass:usage.mass+refill.mass,volume:usage.volume+refill.volume},
-      {mass:container.system.capacityMass,volume:container.system.capacityVolume}))throw Error('Недостаточно места в контейнере для возврата материалов.');
+      {mass:container.system.capacityMass,volume:container.system.capacityVolume}))
+      throw Error('Недостаточно места в контейнере для возврата материалов.');
   }
   return {changes:[...changes.values()],creates};
 }

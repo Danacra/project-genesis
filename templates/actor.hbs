@@ -104,6 +104,9 @@
           {{#if isGM}}<button type="button" data-genesis-action="grant" title="Начисление очков ведущим">+ Начислить ОИ</button>{{/if}}
         </div>
       </div>
+      <div class="genesis-field-entry"><div><strong>Полевые наблюдения</strong><span>Исследования первого этапа: {{research.subDone}} / {{research.subTotal}} завершено</span></div>
+        <button type="button" class="genesis-primary" data-genesis-open-subtree="survey">Открыть программу →</button></div>
+      <div data-genesis-research-main>
       <div class="genesis-tech-toolbar">
         <div class="genesis-tech-filters"><button type="button" data-genesis-tech-filter="all" class="active">Все направления</button>
           {{#each research.branches}}<button type="button" data-genesis-tech-filter="{{id}}">{{label}}</button>{{/each}}</div>
@@ -120,7 +123,7 @@
             {{#each research.eras}}
             <div class="genesis-tech-era"><h3>{{label}}</h3>
               {{#each nodes}}
-              <button type="button" class="genesis-tech-card {{#if unlocked}}is-unlocked{{else}}{{#unless prerequisitesReady}}is-locked{{/unless}}{{/if}}" data-genesis-tech-card="{{id}}" data-genesis-tech-branch="{{branch}}" aria-label="{{name}}">
+              <button type="button" class="genesis-tech-card {{#if isGroup}}genesis-tech-group{{/if}} {{#if unlocked}}is-unlocked{{else}}{{#unless prerequisitesReady}}is-locked{{/unless}}{{/if}}" data-genesis-tech-card="{{id}}" data-genesis-tech-branch="{{branch}}" aria-label="{{name}}">
                 <span class="genesis-tech-card-label">{{branchLabel}}</span><strong>{{name}}</strong>
                 <span class="genesis-tech-card-status">{{statusLabel}}</span>
                 <span class="genesis-tech-progress"><span style="width:{{percent}}%"></span></span>
@@ -136,9 +139,15 @@
           <section data-genesis-tech-detail="{{id}}" hidden>
             <span class="genesis-kicker">{{branchLabel}} · ЭПОХА {{epochDisplay}}</span><h3>{{name}}</h3>
             <p class="genesis-muted">{{description}}</p>
+            {{#if isGroup}}<div class="genesis-survey-inspector"><strong>Программа состоит из 10 исследований</strong>
+              <p>Все десять мини-исследований обязательны для открытия «Полевых наблюдений» и перехода к укрытию, каменным инструментам и анализу воды.</p>
+              <p><strong>{{progress}} / 10</strong> открыто</p>
+              <button type="button" class="genesis-primary" data-genesis-open-subtree="survey">Перейти к мини-исследованиям →</button>
+              </div>{{/if}}
             {{#if unlocked}}
               <p class="genesis-tech-done">✓ Технология изучена колонией</p>
             {{else}}
+              {{#unless isGroup}}
               <div class="genesis-tech-invest"><strong>{{progress}} / {{rp}} ОИ</strong><progress max="{{rp}}" value="{{progress}}"></progress></div>
               {{#if parentsNames.length}}<h4>Предыдущие исследования</h4>
                 <p>{{#each parentsNames}}{{this}}{{#unless @last}} · {{/unless}}{{/each}}</p>{{/if}}
@@ -158,12 +167,62 @@
                 {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить открытие</button>{{/if}}
                 {{#unless remaining}}<p class="genesis-muted">Финансирование завершено. Выполните остальные требования.</p>{{/unless}}
               {{/if}}
+              {{/unless}}
             {{/if}}
-            <h4>Открываемые чертежи</h4>
-            <ul>{{#each recipesNames}}<li>{{this}}</li>{{/each}}</ul>
+            {{#unless isGroup}}<h4>Открываемые чертежи</h4>
+            <ul>{{#each recipesNames}}<li>{{this}}</li>{{/each}}</ul>{{/unless}}
           </section>
           {{/each}}
         </aside>
+      </div>
+      </div><!-- /data-genesis-research-main -->
+      <div class="genesis-research-subtree" data-genesis-research-subtree hidden>
+        <div class="genesis-subtree-header">
+          <button type="button" data-genesis-back-to-tree>← Все технологии</button>
+          <div><span class="genesis-kicker">ПОЛЕВОЙ ЭТАП / ВНУТРЕННЯЯ ПРОГРАММА</span>
+            <h3>Полевые наблюдения</h3>
+            <p class="genesis-muted">Исследуйте десять направлений в любом доступном порядке. Последнее открытие автоматически завершит программу.</p></div>
+          <div class="genesis-subtree-counter"><strong>{{research.subDone}} / {{research.subTotal}}</strong><small>ИЗУЧЕНО</small></div>
+        </div>
+        <div class="genesis-subtree-progress"><span style="width:{{research.subDone}}0%"></span></div>
+        {{#if research.subComplete}}<p class="genesis-tech-done">✓ Полевые наблюдения завершены. Новые колонии теперь могут развивать остальные технологии полевого этапа.</p>{{/if}}
+        <div class="genesis-subtree-layout">
+          <div class="genesis-subtree-phases" role="group" aria-label="Этапы полевых исследований">
+            {{#each research.subPhases}}
+              <section class="genesis-subtree-phase"><header><span>{{name}}</span><small>{{description}}</small></header>
+                {{#each nodes}}
+                  <button type="button" class="genesis-subtech-card {{#if unlocked}}is-unlocked{{else}}{{#unless prerequisitesReady}}is-locked{{/unless}}{{/if}}" data-genesis-subtech-card="{{id}}" aria-label="{{name}}">
+                    <strong>{{name}}</strong><small>{{branchLabel}} · {{statusLabel}}</small>
+                    <span class="genesis-subtech-progress"><span style="width:{{percent}}%"></span></span>
+                    {{#if parentNames.length}}<em>После: {{#each parentNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</em>{{/if}}
+                  </button>
+                {{/each}}
+              </section>
+            {{/each}}
+          </div>
+          <aside class="genesis-subtree-inspector" aria-label="Детали мини-исследования">
+          {{#each research.subDetails}}
+            <section data-genesis-subtech-detail="{{id}}" hidden>
+              <span class="genesis-kicker">{{branchLabel}} · МИНИ-ИССЛЕДОВАНИЕ</span>
+              <h3>{{name}}</h3>
+              <p>{{description}}</p>
+              <h4>Результат изучения</h4><p class="genesis-subtech-result">{{result}}</p>
+              {{#if unlocked}}<p class="genesis-tech-done">✓ Исследование завершено</p>
+              {{else}}
+                <div class="genesis-tech-invest"><strong>{{progress}} / {{rp}} ОИ</strong><progress max="{{rp}}" value="{{progress}}"></progress></div>
+                {{#if parentsNames.length}}<h4>Необходимые открытия</h4><p>{{#each parentsNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+                {{#if missingParentNames.length}}<p class="genesis-tech-alert">Сначала изучите: {{#each missingParentNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+                {{#if ../research.canResearch}}
+                  {{#if canWork}}<button type="button" class="genesis-primary" data-genesis-action="work" data-tech-id="{{id}}">Исследовать (2d10)</button>{{/if}}
+                  {{#if remaining}}<button type="button" data-genesis-action="invest" data-tech-id="{{id}}" {{#unless canInvest}}disabled title="{{investBlockedReason}}"{{/unless}}>Вложить очки</button>{{/if}}
+                  {{#if investBlockedReason}}<p class="genesis-tech-alert">{{investBlockedReason}}</p>{{/if}}
+                  {{#if canFinish}}<button type="button" class="genesis-primary" data-genesis-action="complete" data-tech-id="{{id}}">Завершить исследование</button>{{/if}}
+                {{/if}}
+              {{/if}}
+            </section>
+          {{/each}}
+          </aside>
+        </div>
       </div>
       <div class="genesis-panel"><h3>Научная инфраструктура</h3>
         <p class="genesis-muted">В v0.5 лаборатории и мастерские можно строить во вкладке «Строительство». Ведущий также может вручную отмечать объекты, уже существовавшие в кампании до обновления.</p>
@@ -191,11 +250,11 @@
   <div class="genesis-content genesis-industry-page" data-genesis-page="production" hidden>
     {{#if industry.available}}
     <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / MANUFACTURING</span><h2>Производственные цепочки</h2>
-      <p class="genesis-muted">Материалы списываются при запуске. Время считается по суткам экспедиции. Получение продукции — отдельное действие после окончания работы.</p></div>
+      <p class="genesis-muted">Для локального производства нажмите на станок на карте и выберите источник ресурсов. Для общего производства используйте кнопку в каталоге. Материалы списываются при запуске. Время считается по суткам экспедиции. Получение продукции — отдельное действие после окончания работы.</p></div>
       <div class="genesis-industry-counter"><strong>{{industry.queueCount}}</strong><span>АКТИВНЫХ ЗАДАНИЙ</span></div></div>
     <div class="genesis-panel"><h3>Очередь производства</h3>
       <div class="genesis-job-list">{{#each industry.jobs}}
-        <article class="genesis-job {{#if ready}}is-ready{{/if}}"><div class="genesis-job-main"><strong>{{name}} ×{{amount}}</strong><small>Запустил: {{createdBy}} · День {{startedDay}}</small></div>
+        <article class="genesis-job {{#if ready}}is-ready{{/if}}"><div class="genesis-job-main"><strong>{{name}} ×{{amount}}</strong><small>Запустил: {{createdBy}} · День {{startedDay}} · {{storageName}}</small></div>
           <span class="genesis-job-tag">{{#if ready}}Готово{{else}}Осталось {{remaining}} сут.{{/if}}</span>
           {{#if ../industry.canAct}}{{#if ready}}<button type="button" class="genesis-primary" data-genesis-action="industry" data-industry-action="collect" data-job-id="{{id}}">Получить</button>{{/if}}{{/if}}
           {{#if canCancel}}<button type="button" data-genesis-action="industry" data-industry-action="cancel" data-queue="jobs" data-job-id="{{id}}">Отменить</button>{{/if}}</article>
@@ -217,7 +276,7 @@
   <div class="genesis-content genesis-industry-page" data-genesis-page="construction" hidden>
     {{#if industry.available}}
     <div class="genesis-industry-head"><div><span class="genesis-kicker">PROJECT GENESIS / COLONY DEVELOPMENT</span><h2>Строительство базы</h2>
-      <p class="genesis-muted">Постройка станции добавляет её в инфраструктуру исследований и производства. Складской модуль расширяет вместимость на 750 кг и 1500 л. Новые стройки размещаются на квадратной сетке локальной сцены.</p></div>
+      <p class="genesis-muted">Постройка станции добавляет её в инфраструктуру исследований и производства. «Складской модуль» расширяет общий склад, а новый «Локальный склад» имеет собственные 750 кг / 1500 л. Новые стройки размещаются на квадратной сетке локальной сцены.</p></div>
       <div class="genesis-industry-counter"><strong>{{industry.builtCount}}</strong><span>СООРУЖЕНИЙ ПОСТРОЕНО</span></div></div>
     <div class="genesis-panel"><h3>Текущие стройки</h3>
       <div class="genesis-job-list">{{#each industry.construction}}
@@ -230,11 +289,15 @@
         </article>{{else}}<p class="genesis-muted">Строительных заданий пока нет.</p>{{/each}}</div>
     </div>
     <div class="genesis-panel"><h3>Постройки на картах</h3>
-      <p class="genesis-muted">Здания отображаются как тайлы сцены: оранжевая стройплощадка и готовое здание после приёмки. Не перемещайте тайлы здания вручную через инструмент Tiles: система проверяет координаты при завершении и отмене стройки.</p>
+      <p class="genesis-muted">Постройки можно разбирать (возвращается половина исходных материалов с округлением вниз) или удалять административно без возврата. Перед разборкой отключите сети, завершите перевозки и вынесите вещи из внутренних комнат. Для входа в жилой модуль или помещение-мастерскую нажмите «Войти». Щелчок по готовому станку открывает его рецепты. Внутри помещения можно строить станки обычной кнопкой размещения. Для электроники подключите внешнее помещение кабелем к источнику энергии.</p>
       <div class="genesis-map-list">{{#each industry.placements}}
         <article class="genesis-map-row"><span class="genesis-map-symbol">{{#if isFinished}}◆{{else}}◇{{/if}}</span><div><strong>{{name}}</strong><small>{{sceneName}} · {{#if isFinished}}Построено{{else}}Стройплощадка{{/if}} · ({{x}}, {{y}})</small></div>
           {{#unless mapOk}}<small class="genesis-map-warning">⚠ {{mapProblem}}</small>{{/unless}}
           {{#if canRepair}}<button type="button" class="genesis-map-repair" data-genesis-action="repair-map" data-placement-id="{{id}}">Восстановить тайл (GM)</button>{{/if}}
+          {{#if isFinished}}{{#if isRoom}}<button type="button" class="genesis-primary" data-genesis-action="enter-room" data-placement-id="{{id}}">Войти внутрь</button>{{/if}}
+            {{#if isStation}}<button type="button" class="genesis-primary" data-genesis-action="station-craft" data-placement-id="{{id}}">Крафт</button>{{/if}}{{/if}}
+          {{#if canDismantle}}<button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="salvage" data-placement-id="{{id}}">Разобрать (50%)</button>
+            <button type="button" data-genesis-action="industry" data-industry-action="dismantle" data-dismantle-mode="erase" data-placement-id="{{id}}" class="genesis-danger">Удалить (GM)</button>{{/if}}
           <button type="button" data-genesis-action="map-location" data-scene-id="{{sceneId}}" data-x="{{x}}" data-y="{{y}}">Найти на карте</button></article>
       {{else}}<p class="genesis-muted">Пока ни одно сооружение не размещено на карте.</p>{{/each}}</div>
     </div>
@@ -245,6 +308,7 @@
           <h3>{{name}}</h3><p class="genesis-product-desc">{{description}}</p>
           <div class="genesis-production-meta"><span>ПОСТРОЕНО</span><strong>{{built}} / {{max}}{{#if underConstruction}} · строится {{underConstruction}}{{/if}}</strong></div>
           <div class="genesis-material-grid">{{#each materials}}<div class="genesis-material-chip {{#unless ok}}is-missing{{/unless}}"><span>{{name}}</span><strong>{{available}} / {{required}}</strong></div>{{/each}}</div>
+          {{#if indoorRestricted}}<p class="genesis-tech-alert">Этот объект строится только снаружи помещения.</p>{{/if}}
           {{#if ../industry.canAct}}<button type="button" class="genesis-primary genesis-product-button" data-genesis-action="industry" data-industry-action="start-building" data-subject="{{id}}" {{#unless canQueue}}disabled{{/unless}}>Разместить на карте</button>{{/if}}
           {{#if canPlaceLegacy}}<button type="button" class="genesis-legacy-button" data-genesis-action="industry" data-industry-action="place-existing" data-subject="{{id}}">Отметить готовое на карте ({{legacyUnmapped}})</button>{{/if}}
           {{#if harvest}}{{#if ../industry.canAct}}<button type="button" class="genesis-harvest-button" data-genesis-action="industry" data-industry-action="harvest" data-subject="{{id}}" {{#unless canHarvest}}disabled{{/unless}}>{{#if harvested}}Уже собрано сегодня{{else}}Получить продукцию дня{{/if}}</button>{{/if}}{{/if}}
@@ -342,13 +406,14 @@
           <article class="genesis-crew-deposit"><div><strong>{{name}}</strong><small>{{sceneName}} · Осталось {{remaining}} / {{initial}} · {{#unless health}}Состояние неизвестно{{/unless}}{{health}}</small></div>
             <div class="genesis-network-actions"><button type="button" data-genesis-action="map-location" data-scene-id="{{sceneId}}" data-x="{{x}}" data-y="{{y}}">Показать</button>
             {{#if ../crew.canWork}}{{#if remaining}}<button type="button" class="genesis-primary" data-genesis-action="crew" data-crew-action="start-harvest" data-node-id="{{id}}">Добывать</button>{{/if}}{{/if}}
-            {{#if canRemove}}<button type="button" data-genesis-action="crew" data-crew-action="remove-empty" data-node-id="{{id}}">Убрать</button>{{/if}}</div>
+            {{#if canRemove}}<button type="button" class="genesis-danger" data-genesis-action="crew" data-crew-action="remove-node" data-node-id="{{id}}">Удалить точку (GM)</button>{{/if}}</div>
           </article>{{else}}<p class="genesis-muted">Пока нет месторождений. Ведущий может разместить их прямо на карте.</p>{{/each}}</div></div>
       <div class="genesis-panel"><h3>Локальные склады и площадки</h3>
-        <p class="genesis-muted">Доставка в готовый складской модуль пополняет общий запас колонии — его используют исследования и станки из 0.5. Материалы, доставленные в другие здания, остаются в локальных запасах до последующей перевозки.</p>
+        <p class="genesis-muted">«Складской модуль» по-прежнему пополняет общий запас колонии. Новый «Локальный склад» хранит ресурсы отдельно на карте (750 кг / 1500 л); их можно доставлять, забирать, перевозить и использовать на станке этой карты. Старая система общего склада сохраняется.</p>
         <div class="genesis-crew-site-grid">{{#each crew.sites}}
-          <article class="genesis-crew-site"><div><strong>{{name}}</strong><small>{{sceneName}} · {{#if isStorehouse}}Общий склад{{else}}Локальная площадка{{/if}} · {{status}}</small></div>
-            <div class="genesis-crew-chips">{{#each stock}}<span>{{name}} ×{{quantity}}</span>{{else}}<span>Нет локальных материалов</span>{{/each}}</div>
+          <article class="genesis-crew-site"><div><strong>{{name}}</strong><small>{{sceneName}} · {{#if isStorehouse}}Общий склад{{else}}{{#if isLocalStore}}Локальный склад{{else}}Локальная площадка{{/if}}{{/if}} · {{status}}</small></div>
+            {{#unless isStorehouse}}<div class="genesis-warehouse-capacity">Масса: {{load.mass}} / {{limit.mass}} кг · Объём: {{load.volume}} / {{limit.volume}} л</div>{{/unless}}
+            <div class="genesis-crew-chips">{{#each stock}}<span>{{name}} ×{{quantity}}</span>{{else}}<span>{{#if ../isStorehouse}}Запасы хранятся в общем инвентаре колонии{{else}}Нет локальных материалов{{/if}}</span>{{/each}}</div>
             <button type="button" data-genesis-action="map-location" data-scene-id="{{sceneId}}" data-x="{{x}}" data-y="{{y}}">На карте</button>
           </article>{{else}}<p class="genesis-muted">Для доставки сначала постройте здания на локальной сцене.</p>{{/each}}</div></div>
       <div class="genesis-panel"><h3>Журнал работы экипажа</h3><div class="genesis-log">{{#each crew.history}}

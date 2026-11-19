@@ -44,7 +44,54 @@ export const TECHNOLOGIES = Object.freeze([
   make('orbital-systems','Орбитальные системы','space',4,28,['navigation','habitat','propulsion'],['flightLab'],{circuit:5,alloy:5,glass:3},'Сводная архитектура будущего корабля.',['orbital-core']),
   make('return-project','Проект «Возвращение»','space',4,35,['orbital-systems','advanced-materials'],['flightLab'],{alloy:8,circuit:6,crystal:4},'Финальная научная программа, открывающая этапы сборки и запуска корабля.',['return-blueprint'])
 ]);
+// v1.1: a drill-down expedition programme. These are independent funded
+// discoveries stored in the existing science.unlocked / science.projects fields.
+// "survey" is a composite parent, not another research-point sink.
+const fieldStudy = (id,name,branch,rp,parents,phase,description,result) => ({
+  ...make(id,name,branch,0,rp,parents,[],{},description,[]),group:'survey',phase,result
+});
+export const FIELD_PHASES = Object.freeze([
+  {id:'arrival',name:'01 · Первичная разведка',description:'Исходные условия экспедиции'},
+  {id:'mapping',name:'02 · Картография',description:'Понимание устройства окружающей территории'},
+  {id:'environment',name:'03 · Изучение среды',description:'Ресурсы и закономерности неизвестной планеты'},
+  {id:'report',name:'04 · Сводный анализ',description:'Риски, маршруты и общий отчёт'}
+]);
+export const FIELD_STUDIES = Object.freeze([
+  fieldStudy('survey-landing','Осмотр места посадки','survival',2,[],'arrival',
+    'Обозначить безопасный периметр, точки сбора и сохранённое оборудование после посадки.',
+    'Схема исходного лагеря и перечень найденного имущества.'),
+  fieldStudy('survey-landmarks','Ориентиры и направления','survival',2,['survey-landing'],'mapping',
+    'Выделить устойчивые ориентиры и согласовать названия направлений для всех исследователей.',
+    'Согласованная сетка ориентиров и маршрутные обозначения.'),
+  fieldStudy('survey-terrain','Рельеф и проходимость','materials',3,['survey-landing'],'mapping',
+    'Сопоставить возвышенности, низины, препятствия и возможные участки будущих дорог.',
+    'Первичная карта рельефа и зон ограниченной проходимости.'),
+  fieldStudy('survey-weather','Наблюдение за погодой','survival',2,['survey-landing'],'mapping',
+    'Провести серию записей о ветре, температуре и изменчивости местного климата.',
+    'Полевой метеодневник и признаки приближения непогоды.'),
+  fieldStudy('survey-water','Разведка источников воды','bio',3,['survey-landmarks'],'environment',
+    'Занести на карту ручьи, водоёмы и условия доступа к ним без выводов об их безопасности.',
+    'Карта потенциальных водоисточников для дальнейшего анализа.'),
+  fieldStudy('survey-stones','Каталог поверхностных пород','materials',3,['survey-terrain'],'environment',
+    'Разделить встреченные породы на визуальные группы и отметить места их обнаружения.',
+    'Начальный геологический каталог и перспективные участки для разведки.'),
+  fieldStudy('survey-life','Признаки местной жизни','bio',3,['survey-terrain'],'environment',
+    'Зафиксировать необычные формы растительности, следы организмов и их распространение.',
+    'Журнал биологических наблюдений без предположений о пригодности в пищу.'),
+  fieldStudy('survey-risk','Опасные участки','survival',3,['survey-weather','survey-water'],'report',
+    'Объединить данные о погоде, местности и воде в карту природных рисков.',
+    'Карта предупреждений для экспедиционных маршрутов.'),
+  fieldStudy('survey-resources','Потенциальные ресурсы','materials',3,['survey-stones','survey-life'],'report',
+    'Сопоставить найденные породы и биологические наблюдения с будущими потребностями базы.',
+    'Атлас предполагаемых ресурсов без автоматической добычи.'),
+  fieldStudy('survey-report','Экспедиционный отчёт','survival',4,['survey-risk','survey-resources'],'report',
+    'Свести все полевые записи в единый научный архив и согласовать первоочередные задачи.',
+    'Полевые наблюдения завершены; открывается дальнейшая начальная технологическая программа.')
+]);
+export const FIELD_STUDY_BY_ID = Object.freeze(Object.fromEntries(FIELD_STUDIES.map(t=>[t.id,t])));
 export const TECHNOLOGY_BY_ID = Object.freeze(Object.fromEntries(TECHNOLOGIES.map(t=>[t.id,t])));
+export const RESEARCH_BY_ID = Object.freeze({...TECHNOLOGY_BY_ID,...FIELD_STUDY_BY_ID});
+
 export const RECIPE_LIBRARY = Object.freeze({
   'field-notes':'Полевой архив', 'shelter-kit':'Модуль укрытия', 'stone-kit':'Набор ручных инструментов',
   'water-tester':'Комплект анализа воды', 'field-collection':'Сборник образцов',

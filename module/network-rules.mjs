@@ -12,10 +12,11 @@ export const DEVICES=Object.freeze({
   powerLab:{powerOut:18,priority:0},
   electronicsLab:{power:4,priority:3},
   flightLab:{power:8,water:3,priority:4},
-  storehouse:{priority:9},
+  storehouse:{priority:9}, 'local-store':{priority:9},
   garden:{power:1,water:3,optionalPower:true,optionalWater:true,priority:6},
   'water-recycler':{power:4,waterOut:12,priority:1},
   shelter:{power:2,water:2,optionalPower:true,optionalWater:true,priority:2},
+  room:{power:1,priority:4},
   'assembly-dock':{power:10,water:4,priority:5}
 });
 const key=(x,y)=>`${x}:${y}`;
@@ -198,10 +199,10 @@ export function asNetworkTiles(type,route,{networkId,colonyId,grid}){
 /** Graph traversal keeps independent colonies and Scenes isolated; power is
  * distributed first, then powered water sources produce water for their graphs.
  */
-export function simulateNetworks(placements,links,{linkStatuses={},priorities={}}={}){
+export function simulateNetworks(placements,links,{linkStatuses={},priorities={},interiorLoads={}}={}){
   const active=list(placements).filter(p=>p.status==='finished'&&DEVICES[p.buildingId]);
   const nodes=new Map(active.map(p=>[p.id,{id:p.id,buildingId:p.buildingId,sceneId:p.sceneId,
-    powered:false,watered:false,powerNeed:DEVICES[p.buildingId].power||0,
+    powered:false,watered:false,powerNeed:(DEVICES[p.buildingId].power||0)+(interiorLoads[p.id]||0),
     waterNeed:DEVICES[p.buildingId].water||0,operational:false}]));
   const valid=list(links).filter(l=>NETWORK_TYPES[l.type]&&nodes.has(l.fromId)&&nodes.has(l.toId)&&
     nodes.get(l.fromId).sceneId===nodes.get(l.toId).sceneId&&nodes.get(l.fromId).sceneId===l.sceneId&&linkStatuses[l.id]!=='invalid');
@@ -219,18 +220,18 @@ export function simulateNetworks(placements,links,{linkStatuses={},priorities={}
       // A water station requires an actually powered electrical connection.
       const supply=devices.reduce((sum,{node,config})=>sum+(type==='power'?config.powerOut||0:
         node.powered?config.waterOut||0:0),0);
-      const demand=devices.reduce((sum,{config})=>sum+(type==='power'?config.power||0:config.water||0),0);
+      const demand=devices.reduce((sum,{node,config})=>sum+(type==='power'?node.powerNeed:config.water||0),0);
       let available=supply,served=0;
-      const sorted=devices.filter(({config})=>(type==='power'?config.power:config.water)>0)
+      const sorted=devices.filter(({node,config})=>(type==='power'?node.powerNeed:config.water)>0)
         .sort((a,b)=>(Number.isInteger(priorities[a.node.id])?priorities[a.node.id]:a.config.priority??9)-
           (Number.isInteger(priorities[b.node.id])?priorities[b.node.id]:b.config.priority??9)||a.node.id.localeCompare(b.node.id));
-      for(const {node,config}of sorted){const need=type==='power'?config.power:config.water;
+      for(const {node,config}of sorted){const need=type==='power'?node.powerNeed:config.water;
         const ok=available>=need;
         if(ok){available-=need;served+=need;}
         if(type==='power')node.powered=ok;else node.watered=ok;
       }
       // Generation stations and buildings with no need for this utility.
-      for(const {node,config}of devices){if(type==='power'&&!config.power)node.powered=true;
+      for(const {node,config}of devices){if(type==='power'&&!node.powerNeed)node.powered=true;
         if(type==='water'&&!config.water)node.watered=true;}
       totals[type].supply+=supply;totals[type].demand+=demand;totals[type].served+=served;
       if(component.length>1)totals[type].networks++;

@@ -13,7 +13,8 @@ function setup({materials=[['wood',15],['stone',10],['scrap',6]],tech=['stone-to
   Object.defineProperty(items,'get',{value:id=>items.find(i=>i.id===id)});
   const journal={jobs:[],construction:[],buildings:clone(built),placements:[],processed:[],history:[]};
   const colony={id:'colony',name:'Base',type:'colony',
-    system:{industry:journal,capacity:{mass:2500,volume:10000},science:{unlocked:tech,facilities:[],points:0}},items,
+    system:{industry:journal,capacity:{mass:2500,volume:10000},science:{unlocked:tech,facilities:[],points:0},
+      crew:{nodes:[],caches:[],jobs:[],history:[],processed:[]},infrastructure:{links:[],priorities:[],processed:[]},mission:{stage:0}},items,
     async update(patch){
       if(colonyFailure){const msg=colonyFailure;colonyFailure='';throw new Error(msg);}
       for(const [key,value] of Object.entries(patch)){
@@ -173,4 +174,82 @@ test('GM can map each pre-0.6 built module once, without duplicating stock',asyn
   assert.equal(s.scene.tiles.length,2);
   const catalog=industryContext(s.colony,game.user);
   assert.equal(catalog.buildings.find(b=>b.id==='storehouse').canPlaceLegacy,false);
+});
+
+test('v1.2: dismantling a finished bench removes tile, facility and refunds 50% without losing the world',async()=>{
+  const s=setup();await place();await advanceIndustryDay(s.colony);
+  await run('complete-building',{jobId:s.colony.system.industry.construction[0].id});
+  const id=s.colony.system.industry.placements[0].id;
+  await run('dismantle',{placementId:id,mode:'salvage'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.scene.tiles.length,0);
+  assert.equal(s.colony.system.industry.placements.length,0);
+  assert.equal(s.colony.system.industry.buildings.length,0);
+  assert.deepEqual(s.colony.system.science.facilities,[]);
+  assert.equal(s.items.filter(i=>i.system.resourceCode==='wood').reduce((n,i)=>n+i.system.quantity,0),13);
+  assert.equal(s.items.filter(i=>i.system.resourceCode==='stone').reduce((n,i)=>n+i.system.quantity,0),9);
+});
+test('v1.2: GM erases finished building without refund and existing stock stays untouched',async()=>{
+  const s=setup();await place();await advanceIndustryDay(s.colony);
+  await run('complete-building',{jobId:s.colony.system.industry.construction[0].id});
+  const p=s.colony.system.industry.placements[0];
+  await run('dismantle',{placementId:p.id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.scene.tiles.length,0);
+  assert.equal(s.items.filter(i=>i.system.resourceCode==='wood').reduce((n,i)=>n+i.system.quantity,0),12);
+});
+test('v1.2: live network prevents unsafe dismantling',async()=>{
+  const s=setup();await place();await advanceIndustryDay(s.colony);
+  await run('complete-building',{jobId:s.colony.system.industry.construction[0].id});
+  const p=s.colony.system.industry.placements[0];
+  s.colony.system.infrastructure.links.push({id:'cable1',fromId:p.id,toId:'generator'});
+  await run('dismantle',{placementId:p.id,mode:'salvage'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.match(s.messages.at(-1).message,/электросети/);
+  assert.equal(s.scene.tiles.length,1);
+  assert.equal(s.colony.system.industry.placements.length,1);
+});
+test('v1.2: mid-dismantle failed colony save restores tile and withdraws tentative refund',async()=>{
+  const s=setup();await place();await advanceIndustryDay(s.colony);
+  await run('complete-building',{jobId:s.colony.system.industry.construction[0].id});
+  const p=s.colony.system.industry.placements[0];
+  const original=s.colony.update;
+  let fail=true;
+  s.colony.update=async function(patch){if(fail){fail=false;throw Error('save interrupted');}return original.call(this,patch);};
+  await run('dismantle',{placementId:p.id,mode:'salvage'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.scene.tiles.length,1);
+  assert.equal(s.scene.tiles[0].id,p.tileId);
+  assert.equal(s.colony.system.industry.placements.length,1);
+  assert.equal(s.items.filter(i=>i.system.resourceCode==='wood').reduce((n,i)=>n+i.system.quantity,0),12);
+});
+test('v1.2: room interior only accepts compatible workstations',async()=>{
+  const s=setup({tech:['basic-workshop']});
+  s.scene.flags={'project-genesis':{interiorOf:'room1'}};
+  await run('start-building',{subject:'storehouse',sceneId:'scene1',x:200,y:200});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.scene.tiles.length,0);
+  const work=setup();work.scene.flags={'project-genesis':{interiorOf:'room1',colonyId:'colony',exteriorSceneId:'outside'}};
+  work.colony.system.industry.placements.push({id:'room1',status:'finished',buildingId:'room',sceneId:'outside',interiorSceneId:'scene1'});
+  await run('start-building',{subject:'bench',sceneId:'scene1',x:200,y:200});
+  assert.equal(work.scene.tiles.length,1);
+});
+
+test('v1.2: clicking a specific built station can only start its own recipe',async()=>{
+  const s=setup();await place();await advanceIndustryDay(s.colony);
+  await run('complete-building',{jobId:s.colony.system.industry.construction[0].id});
+  const p=s.colony.system.industry.placements[0];
+  await run('start-recipe',{subject:'workshop-tools',amount:1,stationPlacementId:p.id});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).message);
+  assert.equal(s.colony.system.industry.jobs[0].subject,'workshop-tools');
+  assert.equal(s.colony.system.industry.jobs[0].stationPlacementId,p.id);
+  // A second station does not make dismantling the busy one safe.
+  s.colony.system.industry.buildings[0].count=2;
+  await run('dismantle',{placementId:p.id,mode:'erase'});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.match(s.messages.at(-1).message,/закреплённый за этим станком/);
+  s.colony.system.science.unlocked.push('survey');
+  await run('start-recipe',{subject:'field-notes',amount:1,stationPlacementId:p.id});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.match(s.messages.at(-1).message,/станок/);
 });

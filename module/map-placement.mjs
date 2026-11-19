@@ -3,6 +3,7 @@
  */
 import { BUILDING_FOOTPRINTS,checkPlacement,sceneGeometry } from './map-rules.mjs';
 import { requestIndustry } from './industry.mjs';
+import {assertCanPlaceInside} from './structure-rules.mjs';
 let active=null;
 const notify=message=>ui.notifications.warn(message);
 const isCanvasTarget=target=>target===canvas?.app?.canvas||target===canvas?.app?.view||target?.id==='board';
@@ -13,7 +14,7 @@ export function startPlacement({colonyId,buildingId,buildingName,existing=false}
   const scene=canvas?.scene;
   if(!canvas?.ready||!scene)return notify('Откройте локальную карту колонии перед размещением.');
   if(!BUILDING_FOOTPRINTS[buildingId])return notify('Неизвестное здание.');
-  try{sceneGeometry(scene);}catch(error){return notify(error.message);}
+  try{assertCanPlaceInside(buildingId,scene);sceneGeometry(scene);}catch(error){return notify(error.message);}
   let stopped=false,last=null,lastCursor=null,submitting=false;
   const overlay=document.createElement('div');
   overlay.className='genesis-map-ghost';overlay.style.display='none';

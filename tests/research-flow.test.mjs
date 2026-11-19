@@ -33,22 +33,23 @@ test('GM grant, research, invest and discover via actual game request entrypoint
  const x=fakeGame();
  await requestResearch({action:'grant',colonyId:'col',amount:3});
  assert.equal(x.science.points,3);
- await requestResearch({action:'work',colonyId:'col',actorId:'surv',techId:'survey'});
+ await requestResearch({action:'work',colonyId:'col',actorId:'surv',techId:'survey-landing'});
  assert.equal(x.science.points,6);assert.equal(x.science.dailyWork.length,1);
- await requestResearch({action:'invest',colonyId:'col',techId:'survey',amount:4});
- assert.deepEqual(x.science.unlocked,['survey']);assert.equal(x.science.points,2);
+ await requestResearch({action:'invest',colonyId:'col',techId:'survey-landing',amount:2});
+ assert.deepEqual(x.science.unlocked,['survey-landing']);assert.equal(x.science.points,4);
  assert.ok(x.chats.some(c=>c.content?.includes('Научное открытие')));
 });
 test('scientist cannot gain more RP twice in the same in-game day',async()=>{
  const x=fakeGame();
- await requestResearch({action:'work',colonyId:'col',actorId:'surv',techId:'survey'});
- await requestResearch({action:'work',colonyId:'col',actorId:'surv',techId:'survey'});
+ await requestResearch({action:'work',colonyId:'col',actorId:'surv',techId:'survey-landing'});
+ await requestResearch({action:'work',colonyId:'col',actorId:'surv',techId:'survey-landing'});
  assert.equal(x.science.dailyWork.length,1);
  assert.equal(x.messages.at(-1).kind,'error');
 });
 test('a research that needs materials waits for supply, then consumes it on completion',async()=>{
  const x=fakeGame({points:30,stock:[['wood',2]]});
- await requestResearch({action:'invest',colonyId:'col',techId:'survey',amount:4});
+ // Compatibility: a world created before v1.1 already has the legacy parent researched.
+ x.science.unlocked=['survey'];
  await requestResearch({action:'invest',colonyId:'col',techId:'shelter',amount:5});
  assert.deepEqual(x.science.unlocked,['survey']);assert.equal(x.science.projects[0].invested,5);
  x.colony.items._all.push({id:'f1',type:'material',name:'Fiber',system:{resourceCode:'fiber',quantity:2}});
@@ -76,4 +77,28 @@ test('GM infrastructure toggles and blocks non-ready invest for laboratory tech'
  await requestResearch({action:'invest',colonyId:'col',techId:'basic-workshop',amount:2});
  assert.equal(x.science.points,28);
  assert.deepEqual(x.science.facilities,['bench']);
+});
+
+test('GM can complete all ten nested studies via actual request endpoint and auto-unlock survey',async()=>{
+ const {FIELD_STUDIES}=await import('../module/tech-data.mjs');
+ const x=fakeGame({points:100});
+ for(const tech of FIELD_STUDIES){
+   await requestResearch({action:'invest',colonyId:'col',techId:tech.id,amount:tech.rp});
+   assert.equal(x.messages.at(-1).kind,'info',`Expected ${tech.id} to succeed`);
+   assert.ok(x.science.unlocked.includes(tech.id));
+ }
+ assert.equal(x.science.unlocked.length,11);
+ assert.equal(x.science.unlocked.at(-1),'survey');
+ assert.equal(x.science.discoveries.at(-1).techId,'survey');
+ assert.ok(x.chats.some(x=>x.content?.includes('Экспедиционный отчёт')));
+});
+
+test('GM cannot bypass nested program by funding the survey parent directly',async()=>{
+ const x=fakeGame({points:100});
+ for(const action of ['invest','complete','work']){
+   await requestResearch({action,colonyId:'col',techId:'survey',amount:4,actorId:'surv'});
+   assert.equal(x.messages.at(-1).kind,'error');
+ }
+ assert.equal(x.science.points,100);
+ assert.equal(x.science.unlocked.length,0);
 });

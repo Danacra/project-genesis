@@ -259,3 +259,60 @@ test('0.8.1: two survivors sharing a displayed name are tracked by actor ID',asy
   assert.equal(byId.get('surv'),true);
   assert.equal(byId.get('surv2'),false);
 });
+
+test('v1.2: GM may erase a deposit with resources left, without changing survivor or colony stocks',async()=>{
+  const s=setup(),n=await seed(s);
+  const amount=s.actor.items.length;
+  await s.run('remove-node',{nodeId:n.id});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).text);
+  assert.equal(s.colony.system.crew.nodes.length,0);
+  assert.equal(s.tiles.get(n.tileId),undefined);
+  assert.equal(s.actor.items.length,amount);
+});
+test('v1.2: deposit removal is forbidden during active extraction',async()=>{
+  const s=setup(),n=await seed(s);
+  await harvest(s,n,2);
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).text);
+  await s.run('remove-node',{nodeId:n.id});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.colony.system.crew.nodes.length,1);
+});
+// v1.2.1: separate storage mode leaves the v0.5 shared warehouse untouched.
+function addLocalWarehouse(s){
+  const p={id:'local1',colonyId:'colony',buildingId:'local-store',sceneId:'map',tileId:'tile-local1',jobId:'localjob',x:1300,y:100,width:300,height:300,status:'finished',createdDay:1,by:'GM'};
+  s.placements.push(p);
+  s.tiles.push({id:p.tileId,x:p.x,y:p.y,width:p.width,height:p.height,rotation:0,
+    flags:{'project-genesis':{buildingId:p.buildingId,placementId:p.id,jobId:p.jobId,colonyId:p.colonyId,status:'finished'}}});
+  s.colony.system.industry.buildings.push({id:'local-store',count:1});
+  return p;
+}
+test('v1.2.1 delivery into local store stays separate from colony stock and is recoverable',async()=>{
+  const s=setup({wood:5});addLocalWarehouse(s);
+  await s.run('start-delivery',{actorId:'surv',itemId:s.actor.items[0].id,placementId:'local1',amount:3});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).text);
+  await advanceCrewDay(s.colony);await advanceCrewDay(s.colony);
+  await s.run('finish',{jobId:job(s).id});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).text);
+  assert.equal(s.colony.items.length,0);
+  assert.equal(s.colony.system.crew.caches.find(c=>c.placementId==='local1').stock[0].quantity,3);
+  const display=crewContext(s.colony,s.gm).sites.find(p=>p.id==='local1');
+  assert.equal(display.isLocalStore,true);
+  assert.deepEqual(display.limit,{mass:750,volume:1500});
+  s.setActorAt(1300,100);
+  await s.run('start-pickup',{actorId:'surv',sourceId:'local1',resourceCode:'wood',amount:2});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).text);
+  await advanceCrewDay(s.colony);
+  await s.run('finish',{jobId:job(s).id});
+  assert.equal(s.messages.at(-1).ok,true,s.messages.at(-1).text);
+  assert.equal(s.actor.items.find(i=>i.system.resourceCode==='wood').system.quantity,4);
+  assert.equal(s.colony.system.crew.caches.find(c=>c.placementId==='local1').stock[0].quantity,1);
+});
+test('v1.2.1 local warehouse overflow is checked before removing survivor cargo',async()=>{
+  const s=setup({wood:5});addLocalWarehouse(s);
+  // 749 kg occupied, a new 2 kg item must not enter.
+  s.colony.system.crew.caches=[{placementId:'local1',stock:[{code:'stone',name:'Камень',type:'material',img:'',quantity:749,unitMass:1,unitVolume:1,quality:0,techTier:0,description:''}]}];
+  await s.run('start-delivery',{actorId:'surv',itemId:s.actor.items[0].id,placementId:'local1',amount:1});
+  assert.equal(s.messages.at(-1).ok,false);
+  assert.equal(s.actor.items[0].system.quantity,5);
+  assert.equal(s.colony.system.crew.jobs.length,0);
+});

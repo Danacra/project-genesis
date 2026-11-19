@@ -231,7 +231,7 @@ export function initializeLogistics() {
           notification('Переход суток требует восстановления. Нажмите «+1 сутки» после исправления ошибки.',true);});
     }
   }
-  game.socket.on(`system.${SYSTEM}`,(request)=>{
+  game.socket.on(`system.${SYSTEM}`,(request,senderId)=>{
     if (!request || typeof request !== 'object') return;
     if (request.kind==='transfer-result') {
       if (request.userId !== game.user.id || !awaiting.has(request.id)) return;
@@ -243,6 +243,7 @@ export function initializeLogistics() {
     }
     if (request.kind!=='transfer-request') return;
     if (!game.user.isGM || gmLeader()?.id!==game.user.id) return;
+    if (typeof senderId==='string'&&senderId&&senderId!==request.userId) return;
     if (typeof request.userId !== 'string' || typeof request.id !== 'string' ||
         typeof request.sourceActorId !== 'string' || typeof request.targetActorId !== 'string' ||
         typeof request.itemId !== 'string' || (request.targetContainerId != null && typeof request.targetContainerId !== 'string')) return;

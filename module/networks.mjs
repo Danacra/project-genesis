@@ -5,6 +5,7 @@ import {placementHealth,sceneGeometry} from './map-rules.mjs';
 import {NETWORK_TYPES,NETWORK_LIMITS,DEVICES,routeNetwork,networkCost,
   validateNetworkLink,asNetworkTiles,simulateNetworks,validateManualRoute} from './network-rules.mjs';
 import {BUILDING_BY_ID} from './industry-data.mjs';
+import {roomPowerLoads,sceneInteriorOf} from './structure-rules.mjs';
 const SYSTEM='project-genesis',TIMEOUT=60000;
 const awaiting=new Map(),seen=new Set();
 const list=a=>Array.isArray(a)?a:[];
@@ -29,20 +30,31 @@ function requirePlaced(colony,id){const p=getPlacement(colony,id);const scene=ga
 }
 export function getNetworkSimulation(colony){
   const infra=schema(colony),placements=list(colony.system.industry?.placements);
-  const healthy=placements.filter(p=>p.status==='finished'&&
+  const healthy=placements.filter(p=>!sceneInteriorOf(game.scenes.get(p.sceneId))&&p.status==='finished'&&
     placementHealth(p,game.scenes.get(p.sceneId),game.scenes.get(p.sceneId)?.tiles?.get?.(p.tileId))==='ok');
   const statuses=Object.fromEntries(list(infra.links).map(l=>[l.id,validateNetworkLink(l,game.scenes.get(l.sceneId))]));
   const priorities=Object.fromEntries(list(infra.priorities).map(p=>[p.id,p.priority]));
-  return {simulation:simulateNetworks(healthy,infra.links,{priorities,linkStatuses:Object.fromEntries(Object.entries(statuses).map(([k,v])=>[k,v==='ok'?'ok':'invalid']))}),statuses};
+  return {simulation:simulateNetworks(healthy,infra.links,{priorities,interiorLoads:roomPowerLoads(placements,game.scenes),linkStatuses:Object.fromEntries(Object.entries(statuses).map(([k,v])=>[k,v==='ok'?'ok':'invalid']))}),statuses};
 }
 // Only late-stage manufacturing needs automatic power. Early science/crafting still
 // runs by hand, avoiding a technology deadlock in fresh colonies.
+export function placementOperational(colony,placement,precomputedSimulation=null){
+  const config=DEVICES[placement?.buildingId];
+  if(!config)return false;
+  const parentId=sceneInteriorOf(game.scenes.get(placement.sceneId));
+  if(parentId){
+    const parent=(precomputedSimulation||getNetworkSimulation(colony).simulation).byId[parentId];
+    return Boolean((config.optionalPower || !config.power || parent?.powered) &&
+      (config.optionalWater || !config.water || parent?.watered));
+  }
+  return Boolean((precomputedSimulation||getNetworkSimulation(colony).simulation).byId[placement.id]?.operational);
+}
 export function stationOperational(colony,station,precomputedSimulation=null){
   if(!DEVICES[station]||(!DEVICES[station].power&&!DEVICES[station].water))return true;
   const placements=list(colony.system.industry?.placements).filter(p=>p.buildingId===station&&p.status==='finished');
   if(!placements.length)return true; // legacy 0.5 buildings may not yet be mapped
   const simulation=precomputedSimulation||getNetworkSimulation(colony).simulation;
-  return placements.some(p=>simulation.byId[p.id]?.operational);
+  return placements.some(p=>placementOperational(colony,p,simulation));
 }
 function backupResources(colony,changes){return changes.map(c=>({_id:c._id,'system.quantity':Number(colony.items.get?.(c._id)?.system.quantity||0)}));}
 async function restoreResources(colony,backup){if(backup.length)await colony.updateEmbeddedDocuments('Item',backup);}
@@ -149,10 +161,11 @@ async function doCommit(request){
   seen.add(request.id);if(seen.size>3000)seen.clear();
   return response;
 }
-export function networkContext(actor,user){
+export function networkContext(actor,user,networkSnapshot=null){
   const colony=actor?.type==='colony'?actor:game.actors.find(a=>a.type==='colony');
   if(!colony)return {available:false};
-  const infra=schema(colony),placements=list(colony.system.industry?.placements),{simulation,statuses}=getNetworkSimulation(colony);
+  const infra=schema(colony),placements=list(colony.system.industry?.placements),{simulation,statuses}=networkSnapshot||getNetworkSimulation(colony);
+  const canConnect=user.isGM||game.actors.some(a=>a.type==='survivor'&&a.testUserPermission(user,'OWNER'));
   const buildings=placements.filter(p=>p.status==='finished').map(p=>{
     const node=simulation.byId[p.id],name=BUILDING_BY_ID[p.buildingId]?.name||p.buildingId;
     const priority=node?.priority??DEVICES[p.buildingId]?.priority??9;
@@ -164,16 +177,17 @@ export function networkContext(actor,user){
       status,priority,priorityOptions:Array.from({length:10},(_,n)=>({value:n,label:`${n}${n===0?' · высший':n===9?' · низший':''}`,selected:n===priority})),
       powered:!!node?.powered,watered:!!node?.watered,working:!!node?.operational};
   });
+  const buildingNames=new Map(buildings.map(b=>[b.id,b.name]));
   const links=list(infra.links).map(l=>({
     ...l,name:NETWORK_TYPES[l.type]?.name||l.type,sceneName:game.scenes.get(l.sceneId)?.name||'Неизвестная сцена',
-    from:buildings.find(b=>b.id===l.fromId)?.name||'Удалённое здание',
-    to:buildings.find(b=>b.id===l.toId)?.name||'Удалённое здание',
+    from:buildingNames.get(l.fromId)||'Удалённое здание',
+    to:buildingNames.get(l.toId)||'Удалённое здание',
     length:l.route.length,health:statuses[l.id],ok:statuses[l.id]==='ok',
     canRepair:user.isGM&&statuses[l.id]==='missing-tile',
-    canMaintain:statuses[l.id]==='missing-tile'&&(user.isGM||game.actors.some(a=>a.type==='survivor'&&a.testUserPermission(user,'OWNER'))),
+    canMaintain:statuses[l.id]==='missing-tile'&&canConnect,
     missingSegments:statuses[l.id]==='missing-tile'?list(l.tileIds).filter(id=>!game.scenes.get(l.sceneId)?.tiles?.get?.(id)).length:0,
     canRemove:user.isGM&&statuses[l.id]==='ok'}));
-  return {available:true,colonyId:colony.id,canConnect:user.isGM||game.actors.some(a=>a.type==='survivor'&&a.testUserPermission(user,'OWNER')),
+  return {available:true,colonyId:colony.id,canConnect,
     isGM:user.isGM,buildings,links,totals:simulation.totals,simulation,
     types:Object.entries(NETWORK_TYPES).map(([id,def])=>({id,...def}))};
 }

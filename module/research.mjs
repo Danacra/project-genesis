@@ -1,5 +1,5 @@
 /** GM-coordinated shared colony research, Foundry v13. */
-import { TECHNOLOGIES, TECHNOLOGY_BY_ID, BRANCHES, FACILITIES, RECIPE_LIBRARY } from './tech-data.mjs';
+import { TECHNOLOGIES, TECHNOLOGY_BY_ID, RESEARCH_BY_ID, FIELD_STUDIES, FIELD_PHASES, BRANCHES, FACILITIES, RECIPE_LIBRARY } from './tech-data.mjs';
 import { techStatus, planInvestment, planMaterialUse, completionPatch, unlockedRecipes } from './research-rules.mjs';
 import { withWorldLock } from './logistics.mjs';
 import { stationOperational } from './networks.mjs';
@@ -16,30 +16,45 @@ export function colonyFor(actor) {
   if(actor.type==='colony')return actor;
   return game.actors.find(a=>a.type==='colony')||null;
 }
-export function researchContext(colony, user) {
+export function researchContext(colony, user, networkSimulation=null) {
   if(!colony)return {available:false};
   const science=colony.system.science;
-  const statusMap=Object.fromEntries(TECHNOLOGIES.map(t=>{
+  const statusMap=Object.fromEntries([...TECHNOLOGIES,...FIELD_STUDIES].map(t=>{
     const status=techStatus(t.id,science,colony.items);
-    const powerReady=t.facilities.every(id=>stationOperational(colony,id));
-    const remaining=Math.max(0,t.rp-status.progress);
-    const investBlockedReason=status.unlocked?'Технология уже изучена.':
+    const powerReady=t.facilities.every(id=>stationOperational(colony,id,networkSimulation));
+    const remaining=t.id==='survey'?0:Math.max(0,t.rp-status.progress);
+    const investBlockedReason=t.id==='survey'?'Завершите десять мини-исследований внутри программы.':
+      status.unlocked?'Технология уже изучена.':
       !status.prerequisitesReady?'Сначала изучите предыдущие технологии.':
       !status.facilityReady?'Необходимая лаборатория или мастерская отсутствует.':
       !powerReady?'Требуемая инфраструктура обесточена.':
       !remaining?'Исследование уже полностью профинансировано.':
       !science.points?'Нет свободных очков исследований.':'';
     return [t.id,{...status,powerReady,canInvest:!investBlockedReason,
-      canWork:!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
+      canWork:t.id!=='survey'&&!status.unlocked&&status.prerequisitesReady&&status.facilityReady&&powerReady&&remaining>0,
       canFinish:status.canFinish&&powerReady,investBlockedReason}];
   }));
   const eras=[0,1,2,3,4].map(t=>({tier:t,label:['01 · ПОЛЕВОЙ ЭТАП','02 · РЕМЕСЛО','03 · НАУЧНАЯ БАЗА','04 · ПРОМЫШЛЕННОСТЬ','05 · КОСМОС'][t],nodes:TECHNOLOGIES.filter(x=>x.t===t).map(x=>({
     ...x,...statusMap[x.id],branchLabel:BRANCHES[x.branch],shortParent:x.parents.length,
-    statusLabel:statusMap[x.id].unlocked?'Изучено':statusMap[x.id].canFinish?'Готово к открытию':statusMap[x.id].missingParents.length?'Заблокировано':`${statusMap[x.id].progress}/${x.rp} ОИ`
+    statusLabel:x.id==='survey'?`${statusMap[x.id].progress}/10 исследований · ${statusMap[x.id].unlocked?'завершено':'открыть'}`:
+      statusMap[x.id].unlocked?'Изучено':statusMap[x.id].canFinish?'Готово к открытию':statusMap[x.id].missingParents.length?'Заблокировано':`${statusMap[x.id].progress}/${x.rp} ОИ`
   }))}));
+  const currentDay=day();
+  const workedToday=new Set((science.dailyWork||[]).filter(w=>w.day===currentDay).map(w=>w.actorId));
   const availablePeople=game.actors.filter(a=>a.type==='survivor' && (user.isGM||a.testUserPermission(user,'OWNER')))
-    .map(a=>({id:a.id,name:a.name,used:(science.dailyWork||[]).some(w=>w.actorId===a.id&&w.day===day())}));
+    .map(a=>({id:a.id,name:a.name,used:workedToday.has(a.id)}));
   const branches=Object.entries(BRANCHES).map(([id,label])=>({id,label}));
+  const subPhases=FIELD_PHASES.map(phase=>({...phase,nodes:FIELD_STUDIES.filter(t=>t.phase===phase.id).map(t=>({
+    ...t,...statusMap[t.id],branchLabel:BRANCHES[t.branch],
+    statusLabel:statusMap[t.id].unlocked?'Изучено':!statusMap[t.id].prerequisitesReady?'Требует открытий':`${statusMap[t.id].progress}/${t.rp} ОИ`,
+    parentNames:t.parents.map(id=>RESEARCH_BY_ID[id].name)
+  }))}));
+  const subDetails=FIELD_STUDIES.map(tech=>({
+    ...tech,...statusMap[tech.id],branchLabel:BRANCHES[tech.branch],
+    remaining:Math.max(0,tech.rp-statusMap[tech.id].progress),
+    missingParentNames:statusMap[tech.id].missingParents.map(id=>RESEARCH_BY_ID[id].name),
+    parentsNames:tech.parents.map(id=>RESEARCH_BY_ID[id].name)
+  }));
   const details=TECHNOLOGIES.map(tech=>({
     ...tech,...statusMap[tech.id],branchLabel:BRANCHES[tech.branch],epochDisplay:tech.t+1,
     missingParentNames:statusMap[tech.id].missingParents.map(id=>TECHNOLOGY_BY_ID[id].name),
@@ -47,12 +62,13 @@ export function researchContext(colony, user) {
     requiredFacilityNames:tech.facilities.map(id=>FACILITIES[id]),
     parentsNames:tech.parents.map(id=>TECHNOLOGY_BY_ID[id].name),
     recipesNames:tech.recipes.map(id=>RECIPE_LIBRARY[id]||id),
-    remaining:Math.max(0,tech.rp-statusMap[tech.id].progress)
+    remaining:tech.id==='survey'?0:Math.max(0,tech.rp-statusMap[tech.id].progress)
   }));
-  return {available:true,colonyId:colony.id,colonyName:colony.name,science,eras,details,
+  return {available:true,colonyId:colony.id,colonyName:colony.name,science,eras,details,subPhases,subDetails,
+    subDone:statusMap.survey.progress,subTotal:FIELD_STUDIES.length,subComplete:statusMap.survey.unlocked,
     statusMap,branches,facilities:Object.entries(FACILITIES).map(([id,name])=>({id,name,active:(science.facilities||[]).includes(id)})),
     recipes:unlockedRecipes(science),canResearch:user.isGM||availablePeople.length>0,
-    people:availablePeople,history:[...(science.discoveries||[])].reverse().map(d=>({...d,techName:TECHNOLOGY_BY_ID[d.techId]?.name||d.techId})),day:day(),isGM:user.isGM,
+    people:availablePeople,history:[...(science.discoveries||[])].reverse().map(d=>({...d,techName:RESEARCH_BY_ID[d.techId]?.name||d.techId})),day:day(),isGM:user.isGM,
     progressCount:TECHNOLOGIES.filter(t=>statusMap[t.id].unlocked).length,techCount:TECHNOLOGIES.length};
 }
 function authorize(request) {
@@ -67,10 +83,11 @@ function authorize(request) {
 }
 function assertProjectReady(colony,techId) {
   const status=techStatus(techId,colony.system.science,colony.items);
+  if(techId==='survey')throw new Error('Откройте десять мини-исследований внутри программы «Полевые наблюдения».');
   if(status.unlocked)throw new Error('Открытие уже исследовано.');
   if(!status.prerequisitesReady)throw new Error('Не исследованы предшествующие технологии.');
   if(!status.facilityReady)throw new Error('Для работы необходимы лаборатория или мастерская.');
-  if(TECHNOLOGY_BY_ID[techId]?.facilities.some(id=>!stationOperational(colony,id)))
+  if(RESEARCH_BY_ID[techId]?.facilities.some(id=>!stationOperational(colony,id)))
     throw new Error('Для исследования необходима работающая инфраструктура: проверьте электроснабжение.');
   return status;
 }
@@ -94,16 +111,18 @@ async function finish(colony,techId,user) {
     throw error;
   }
   try {
-    await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · Научное открытие</strong><p>Колония ${escape(colony.name)} исследовала «${escape(TECHNOLOGY_BY_ID[techId].name)}» (день ${day()}).</p></div>`});
+    await ChatMessage.create({content:`<div class="genesis-chat"><strong>PROJECT GENESIS · Научное открытие</strong><p>Колония ${escape(colony.name)} исследовала «${escape(RESEARCH_BY_ID[techId].name)}» (день ${day()}).</p></div>`});
   }catch(error){console.warn('PROJECT GENESIS: science notification failed',error);}
-  return `Открыта технология: ${TECHNOLOGY_BY_ID[techId].name}.`;
+  return `Открыто исследование: ${RESEARCH_BY_ID[techId].name}.`+
+    (RESEARCH_BY_ID[techId].group && colony.system.science.unlocked.includes('survey')?' Полевые наблюдения завершены!':'');
 }
 async function commit(request) {
   if(!/^[\w-]{12,80}$/.test(request.id||''))throw new Error('Некорректный идентификатор действия.');
   if(handled.has(request.id))return 'Повторная операция проигнорирована.';
   const {u,colony}=authorize(request);
-  const tech=TECHNOLOGY_BY_ID[request.techId];
+  const tech=RESEARCH_BY_ID[request.techId];
   if(!tech && request.action!=='facility' && request.action!=='grant')throw new Error('Неизвестное исследование.');
+  if(tech?.id==='survey' && ['work','invest','complete'].includes(request.action))throw new Error('Начните с десяти исследований внутри «Полевых наблюдений».');
   let result;
   if(request.action==='work') {
     const status=assertProjectReady(colony,request.techId);
@@ -189,4 +208,4 @@ export function initializeResearch() {
     });
   });
 }
-export { TECHNOLOGIES, BRANCHES, FACILITIES };
+export { TECHNOLOGIES, FIELD_STUDIES, BRANCHES, FACILITIES };
